@@ -1,7 +1,7 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import { useState } from 'react';
-import { useUser } from '@clerk/nextjs';
+
 import { useRouter } from 'next/navigation';
 
 const STEPS = [
@@ -65,7 +65,7 @@ const STEPS = [
 ];
 
 export default function OnboardPage() {
-  const { user } = useUser();
+  
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
