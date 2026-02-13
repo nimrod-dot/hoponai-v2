@@ -21,7 +21,7 @@ export default function ContactSalesPage() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/contact-sales', {
+      const response = await fetch('/api/sales-inquiry', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData),
