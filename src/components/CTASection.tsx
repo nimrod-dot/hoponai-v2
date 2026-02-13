@@ -1,18 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import Link from 'next/link';
 import Reveal from './Reveal';
 
 export default function CTASection() {
-  const [email, setEmail] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-
-  const handleSubmit = () => {
-    if (!email) return;
-    // TODO: Connect to Supabase
-    setSubmitted(true);
-  };
-
   return (
     <section id="cta" style={{ background: 'var(--bg)', padding: '72px 2rem 88px', borderTop: '1px solid var(--border)' }}>
       <div style={{
@@ -22,36 +13,29 @@ export default function CTASection() {
       }}>
         <Reveal>
           <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 30, color: 'var(--heading)', margin: '0 0 8px' }}>
-            See Hoponai in action
+            Ready to transform how your team learns?
           </h2>
-          <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 24px' }}>
-            Get a personalized demo for your organization. Limited early access spots available.
+          <p style={{ fontSize: 14, color: 'var(--muted)', margin: '0 0 28px' }}>
+            Start for free with up to 5 team members. No credit card required.
           </p>
-          {!submitted ? (
-            <div style={{ display: 'flex', gap: 8, maxWidth: 420, margin: '0 auto', flexWrap: 'wrap', justifyContent: 'center' }}>
-              <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-                placeholder="your@company.com"
-                style={{
-                  flex: '1 1 240px', padding: '12px 14px', borderRadius: 8, border: '1px solid var(--border)',
-                  background: 'var(--bg)', color: 'var(--heading)', fontSize: 14,
-                  fontFamily: "'Plus Jakarta Sans', sans-serif", outline: 'none', transition: 'border-color 0.2s',
-                }}
-                onFocus={(e) => (e.target.style.borderColor = 'var(--blue)')}
-                onBlur={(e) => (e.target.style.borderColor = 'var(--border)')}
-              />
-              <button onClick={handleSubmit} style={{
-                background: 'var(--blue)', color: 'var(--white)', border: 'none', padding: '12px 24px',
-                borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer',
-                fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.2s', whiteSpace: 'nowrap',
-              }}
-                onMouseEnter={(e) => ((e.target as HTMLElement).style.background = 'var(--blue-dark)')}
-                onMouseLeave={(e) => ((e.target as HTMLElement).style.background = 'var(--blue)')}
-              >Get a Demo</button>
-            </div>
-          ) : (
-            <div style={{ fontSize: 15, color: 'var(--blue)', fontWeight: 600 }}>✓ We'll be in touch shortly.</div>
-          )}
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link href="/sign-up" style={{
+              background: 'var(--blue)', color: 'var(--white)', border: 'none', padding: '14px 32px',
+              borderRadius: 10, fontWeight: 600, fontSize: 16, display: 'inline-block',
+              fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.2s',
+              boxShadow: '0 2px 8px rgba(14,165,233,0.2)',
+            }}>
+              Get Started - Free
+            </Link>
+            <Link href="/contact-sales" style={{
+              background: 'var(--white)', color: 'var(--heading)', border: '1px solid var(--border)',
+              padding: '14px 32px', borderRadius: 10, fontWeight: 600, fontSize: 16,
+              display: 'inline-block', fontFamily: "'Plus Jakarta Sans', sans-serif",
+              transition: 'all 0.2s', textDecoration: 'none',
+            }}>
+              Contact Sales
+            </Link>
+          </div>
         </Reveal>
       </div>
     </section>

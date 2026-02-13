@@ -4,20 +4,43 @@ import { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 
+const BLOCKED_DOMAINS = [
+  'gmail.com', 'yahoo.com', 'yahoo.co.il', 'hotmail.com', 'outlook.com',
+  'aol.com', 'icloud.com', 'mail.com', 'protonmail.com', 'proton.me',
+  'zoho.com', 'yandex.com', 'gmx.com', 'live.com', 'me.com',
+  'msn.com', 'inbox.com', 'walla.co.il', 'walla.com',
+];
+
+function isBusinessEmail(email: string): boolean {
+  const domain = email.split('@')[1]?.toLowerCase();
+  if (!domain) return false;
+  return !BLOCKED_DOMAINS.includes(domain);
+}
+
 export default function ContactSalesPage() {
   const [formData, setFormData] = useState({
-    name: '',
     email: '',
     company: '',
     companySize: '',
-    phone: '',
     message: '',
   });
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [emailError, setEmailError] = useState('');
+
+  const handleEmailChange = (value: string) => {
+    setFormData({ ...formData, email: value });
+    if (emailError) setEmailError('');
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isBusinessEmail(formData.email)) {
+      setEmailError('Please use your work email (no personal email addresses like Gmail or Yahoo).');
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -82,11 +105,11 @@ export default function ContactSalesPage() {
   return (
     <>
       <Navbar />
-      
+
       <section style={{
         minHeight: '100vh', background: 'var(--bg)', padding: '140px 2rem 80px',
       }}>
-        <div style={{ maxWidth: 640, margin: '0 auto' }}>
+        <div style={{ maxWidth: 520, margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: 40 }}>
             <h1 style={{
               fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 40,
@@ -107,29 +130,7 @@ export default function ContactSalesPage() {
             }}
           >
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {/* Name */}
-              <div>
-                <label style={{
-                  display: 'block', fontSize: 14, fontWeight: 600,
-                  color: 'var(--heading)', marginBottom: 6,
-                }}>
-                  Full Name *
-                </label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  style={{
-                    width: '100%', padding: '10px 14px', borderRadius: 8,
-                    border: '1px solid var(--border)', fontSize: 14,
-                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  }}
-                  placeholder="John Doe"
-                />
-              </div>
-
-              {/* Email */}
+              {/* Work Email */}
               <div>
                 <label style={{
                   display: 'block', fontSize: 14, fontWeight: 600,
@@ -141,17 +142,23 @@ export default function ContactSalesPage() {
                   type="email"
                   required
                   value={formData.email}
-                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  onChange={(e) => handleEmailChange(e.target.value)}
                   style={{
                     width: '100%', padding: '10px 14px', borderRadius: 8,
-                    border: '1px solid var(--border)', fontSize: 14,
+                    border: `1px solid ${emailError ? '#ef4444' : 'var(--border)'}`, fontSize: 14,
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    boxSizing: 'border-box',
                   }}
-                  placeholder="john@company.com"
+                  placeholder="you@company.com"
                 />
+                {emailError && (
+                  <p style={{ fontSize: 13, color: '#ef4444', margin: '6px 0 0', lineHeight: 1.4 }}>
+                    {emailError}
+                  </p>
+                )}
               </div>
 
-              {/* Company */}
+              {/* Company Name */}
               <div>
                 <label style={{
                   display: 'block', fontSize: 14, fontWeight: 600,
@@ -168,6 +175,7 @@ export default function ContactSalesPage() {
                     width: '100%', padding: '10px 14px', borderRadius: 8,
                     border: '1px solid var(--border)', fontSize: 14,
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
+                    boxSizing: 'border-box',
                   }}
                   placeholder="Acme Corp"
                 />
@@ -179,10 +187,9 @@ export default function ContactSalesPage() {
                   display: 'block', fontSize: 14, fontWeight: 600,
                   color: 'var(--heading)', marginBottom: 6,
                 }}>
-                  Company Size *
+                  Company Size
                 </label>
                 <select
-                  required
                   value={formData.companySize}
                   onChange={(e) => setFormData({ ...formData, companySize: e.target.value })}
                   style={{
@@ -190,6 +197,7 @@ export default function ContactSalesPage() {
                     border: '1px solid var(--border)', fontSize: 14,
                     fontFamily: "'Plus Jakarta Sans', sans-serif",
                     background: 'var(--white)',
+                    boxSizing: 'border-box',
                   }}
                 >
                   <option value="">Select company size</option>
@@ -198,27 +206,6 @@ export default function ContactSalesPage() {
                   <option value="201-1000">201-1,000 employees</option>
                   <option value="1000+">1,000+ employees</option>
                 </select>
-              </div>
-
-              {/* Phone */}
-              <div>
-                <label style={{
-                  display: 'block', fontSize: 14, fontWeight: 600,
-                  color: 'var(--heading)', marginBottom: 6,
-                }}>
-                  Phone Number
-                </label>
-                <input
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                  style={{
-                    width: '100%', padding: '10px 14px', borderRadius: 8,
-                    border: '1px solid var(--border)', fontSize: 14,
-                    fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  }}
-                  placeholder="+1 (555) 123-4567"
-                />
               </div>
 
               {/* Message */}
@@ -232,11 +219,12 @@ export default function ContactSalesPage() {
                 <textarea
                   value={formData.message}
                   onChange={(e) => setFormData({ ...formData, message: e.target.value })}
-                  rows={4}
+                  rows={3}
                   style={{
                     width: '100%', padding: '10px 14px', borderRadius: 8,
                     border: '1px solid var(--border)', fontSize: 14,
                     fontFamily: "'Plus Jakarta Sans', sans-serif", resize: 'vertical',
+                    boxSizing: 'border-box',
                   }}
                   placeholder="Tell us about your training challenges..."
                 />
@@ -254,23 +242,10 @@ export default function ContactSalesPage() {
                   transition: 'all 0.2s', marginTop: 8,
                 }}
               >
-                {loading ? 'Sending...' : 'Request Demo'}
+                {loading ? 'Sending...' : 'Get in Touch'}
               </button>
             </div>
           </form>
-
-          {/* Trust badges */}
-          <div style={{
-            marginTop: 32, padding: 24, background: 'var(--white)',
-            borderRadius: 12, border: '1px solid var(--border)', textAlign: 'center',
-          }}>
-            <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 12 }}>
-              Trusted by enterprise teams at
-            </div>
-            <div style={{ fontSize: 14, color: 'var(--heading)', fontWeight: 600 }}>
-              Companies with 200+ employees
-            </div>
-          </div>
         </div>
       </section>
 

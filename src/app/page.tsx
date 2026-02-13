@@ -38,19 +38,17 @@ function Hero() {
 
         <Reveal delay={0.3}>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <Link href="#cta" style={{
+            <Link href="/sign-up" style={{
               background: 'var(--blue)', color: 'var(--white)', padding: '14px 32px', borderRadius: 10,
               fontWeight: 600, fontSize: 16, display: 'inline-block', boxShadow: '0 2px 8px rgba(14,165,233,0.2)',
               transition: 'all 0.2s',
-            }}>Get a Demo</Link>
-            <button style={{
+            }}>Get Started</Link>
+            <Link href="/contact-sales" style={{
               background: 'var(--white)', color: 'var(--heading)', border: '1px solid var(--border)',
-              padding: '14px 32px', borderRadius: 10, fontWeight: 600, fontSize: 16, cursor: 'pointer',
+              padding: '14px 32px', borderRadius: 10, fontWeight: 600, fontSize: 16,
               fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.2s',
-            }}
-              onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--blue)'; e.currentTarget.style.color = 'var(--blue)'; }}
-              onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--heading)'; }}
-            >Watch Video ▶</button>
+              display: 'inline-block', textDecoration: 'none',
+            }}>Contact Sales</Link>
           </div>
         </Reveal>
       </div>
@@ -64,7 +62,7 @@ function Problem() {
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         <Reveal>
           <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 38, color: 'var(--heading)', textAlign: 'center', margin: '0 0 8px' }}>
-            Corporate training hasn't changed in 20 years.
+            Corporate training hasn&apos;t changed in 20 years.
           </h2>
           <p style={{ fontSize: 15, color: 'var(--muted)', textAlign: 'center', margin: '0 0 44px', maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
             Videos, PDFs, tooltips, and slide decks. None of them actually teach. Hoponai does.

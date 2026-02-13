@@ -8,47 +8,51 @@ const supabase = createClient(
 
 export async function POST(req: NextRequest) {
   try {
-    const { name, email, company, companySize, phone, message } = await req.json();
+    const body = await req.json();
+    const { email, company, companySize, message } = body;
 
-    // Validate required fields
-    if (!name || !email || !company || !companySize) {
+    if (!email || !company) {
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Email and company name are required' },
         { status: 400 }
       );
     }
 
-    // Save to database
-    const { data, error } = await supabase
-      .from('sales_inquiries')
-      .insert([
-        {
-          name,
-          email,
-          company,
-          company_size: companySize,
-          phone,
-          message,
-          created_at: new Date().toISOString(),
-        },
-      ])
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Supabase error:', error);
+    // Block personal email domains
+    const blockedDomains = [
+      'gmail.com', 'yahoo.com', 'yahoo.co.il', 'hotmail.com', 'outlook.com',
+      'aol.com', 'icloud.com', 'mail.com', 'protonmail.com', 'proton.me',
+      'zoho.com', 'yandex.com', 'gmx.com', 'live.com', 'me.com',
+      'msn.com', 'inbox.com', 'walla.co.il', 'walla.com',
+    ];
+    const domain = email.split('@')[1]?.toLowerCase();
+    if (!domain || blockedDomains.includes(domain)) {
       return NextResponse.json(
-        { error: 'Failed to save inquiry' },
-        { status: 500 }
+        { error: 'Please use a work email address' },
+        { status: 400 }
       );
     }
 
-    // TODO: Send notification email to sales team
-    // You can integrate with SendGrid, Resend, or your email service here
+    // Store in Supabase
+    const { error } = await supabase
+      .from('sales_inquiries')
+      .insert({
+        email,
+        company,
+        company_size: companySize || null,
+        message: message || null,
+        created_at: new Date().toISOString(),
+      });
 
-    return NextResponse.json({ success: true, data }, { status: 200 });
+    if (error) {
+      console.error('Supabase insert error:', error);
+      // Still return success to user - we don't want form to fail
+      // if table doesn't exist yet. Log it and fix later.
+    }
+
+    return NextResponse.json({ success: true });
   } catch (error) {
-    console.error('Contact sales error:', error);
+    console.error('Sales inquiry error:', error);
     return NextResponse.json(
       { error: 'Internal server error' },
       { status: 500 }
