@@ -94,14 +94,37 @@ export default function Navbar() {
             Pricing
           </Link>
 
-          <Link href="#cta" style={{
+          {/* Contact Sales link */}
+          <Link href="/contact-sales" style={{
+            color: 'var(--text)', fontSize: 14, fontWeight: 500,
+            transition: 'color 0.2s', textDecoration: 'none',
+          }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--blue)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text)')}
+          >
+            Contact Sales
+          </Link>
+
+          {/* Sign In link */}
+          <Link href="/sign-in" style={{
+            color: 'var(--text)', fontSize: 14, fontWeight: 500,
+            transition: 'color 0.2s', textDecoration: 'none',
+          }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--blue)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text)')}
+          >
+            Sign In
+          </Link>
+
+          {/* Get Started button */}
+          <Link href="/sign-up" style={{
             background: 'var(--blue)', color: 'var(--white)', padding: '9px 22px', borderRadius: 8,
             fontWeight: 600, fontSize: 14, transition: 'all 0.2s', display: 'inline-block',
           }}
             onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--blue-dark)'; (e.target as HTMLElement).style.transform = 'translateY(-1px)'; }}
             onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'var(--blue)'; (e.target as HTMLElement).style.transform = ''; }}
           >
-            Get a Demo
+            Get Started
           </Link>
         </div>
       </div>
