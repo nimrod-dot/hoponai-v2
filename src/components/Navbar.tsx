@@ -83,6 +83,17 @@ export default function Navbar() {
             )}
           </div>
 
+          {/* Pricing link */}
+          <Link href="/pricing" style={{
+            color: 'var(--text)', fontSize: 14, fontWeight: 500,
+            transition: 'color 0.2s', textDecoration: 'none',
+          }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--blue)')}
+            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text)')}
+          >
+            Pricing
+          </Link>
+
           <Link href="#cta" style={{
             background: 'var(--blue)', color: 'var(--white)', padding: '9px 22px', borderRadius: 8,
             fontWeight: 600, fontSize: 14, transition: 'all 0.2s', display: 'inline-block',

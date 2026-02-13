@@ -1,7 +1,6 @@
 'use client';
 export const dynamic = 'force-dynamic';
 import { useState } from 'react';
-
 import { useRouter } from 'next/navigation';
 
 const STEPS = [
@@ -62,10 +61,34 @@ const STEPS = [
       { value: 'cost', label: 'Training costs too much' },
     ],
   },
+  {
+    id: 'plan',
+    question: 'Choose your plan',
+    subtitle: 'You can change this anytime',
+    type: 'single',
+    options: [
+      { 
+        value: 'trial', 
+        label: '14-Day Free Trial', 
+        desc: 'Full features • Up to 5 users • 2 walkthroughs • 5 AI runs',
+        badge: 'Start Here',
+      },
+      { 
+        value: 'pro', 
+        label: 'Pro - $12/seat/month', 
+        desc: 'Up to 100 users • Unlimited walkthroughs • 100 AI runs/month',
+        badge: 'Most Popular',
+      },
+      { 
+        value: 'enterprise', 
+        label: 'Enterprise - Custom Pricing', 
+        desc: 'Unlimited everything • Dedicated CSM • White-label • SSO',
+      },
+    ],
+  },
 ];
 
 export default function OnboardPage() {
-  
   const router = useRouter();
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string | string[]>>({});
@@ -103,7 +126,7 @@ export default function OnboardPage() {
     if (step < STEPS.length - 1) {
       setStep(step + 1);
     } else {
-      // Submit
+      // Final submission
       setLoading(true);
       try {
         await fetch('/api/onboarding', {
@@ -114,9 +137,16 @@ export default function OnboardPage() {
             systems_used: answers.systems,
             team_size: answers.team_size,
             biggest_pain: answers.pain,
+            selected_plan: answers.plan,
           }),
         });
-        router.push('/dashboard');
+        
+        // Redirect based on plan selection
+        if (answers.plan === 'enterprise') {
+          router.push('/contact-sales?source=onboarding');
+        } else {
+          router.push('/dashboard');
+        }
       } catch (err) {
         console.error('Onboarding error:', err);
         setLoading(false);
@@ -185,8 +215,19 @@ export default function OnboardPage() {
                 textAlign: 'left',
                 transition: 'all 0.15s',
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
+                position: 'relative',
               }}
             >
+              {'badge' in opt && (opt as any).badge && (
+                <div style={{
+                  position: 'absolute', top: -8, right: 12,
+                  background: '#0EA5E9', color: '#fff',
+                  padding: '2px 10px', borderRadius: 12,
+                  fontSize: 11, fontWeight: 600,
+                }}>
+                  {(opt as any).badge}
+                </div>
+              )}
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 {'icon' in opt && (
                   <span style={{ fontSize: 24 }}>{(opt as any).icon}</span>
