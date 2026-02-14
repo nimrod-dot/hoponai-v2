@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
+import { useUser, UserButton } from '@clerk/nextjs';
 
 const solutions = [
   { href: '/solutions/onboarding', label: 'Employee Onboarding', desc: 'Get every new hire productive from day one' },
@@ -14,6 +16,11 @@ export default function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const [dropOpen, setDropOpen] = useState(false);
   const dropRef = useRef<HTMLDivElement>(null);
+  const pathname = usePathname();
+  const { isSignedIn, user, isLoaded } = useUser();
+
+  const isDashboard = pathname.startsWith('/dashboard');
+  const logoHref = isDashboard ? '/dashboard' : '/';
 
   useEffect(() => {
     const h = () => setScrolled(window.scrollY > 40);
@@ -39,7 +46,8 @@ export default function Navbar() {
       transition: 'all 0.3s', padding: '0 2rem',
     }}>
       <div style={{ maxWidth: 1120, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 68 }}>
-        <Link href="/" style={{ display: 'flex', alignItems: 'baseline' }}>
+        {/* Logo - always links home or dashboard */}
+        <Link href={logoHref} style={{ display: 'flex', alignItems: 'baseline' }}>
           <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 26, color: 'var(--heading)' }}>hopon</span>
           <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 26, color: 'var(--blue)' }}>ai</span>
         </Link>
@@ -105,27 +113,56 @@ export default function Navbar() {
             Contact Sales
           </Link>
 
-          {/* Sign In link */}
-          <Link href="/sign-in" style={{
-            color: 'var(--text)', fontSize: 14, fontWeight: 500,
-            transition: 'color 0.2s', textDecoration: 'none',
-          }}
-            onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--blue)')}
-            onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text)')}
-          >
-            Sign In
-          </Link>
+          {/* Auth-aware section */}
+          {isLoaded && isSignedIn ? (
+            <>
+              {/* Dashboard link if not already there */}
+              {!isDashboard && (
+                <Link href="/dashboard" style={{
+                  color: 'var(--text)', fontSize: 14, fontWeight: 500,
+                  transition: 'color 0.2s', textDecoration: 'none',
+                }}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--blue)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text)')}
+                >
+                  Dashboard
+                </Link>
+              )}
+              {/* Clerk UserButton with avatar */}
+              <UserButton
+                afterSignOutUrl="/"
+                appearance={{
+                  elements: {
+                    avatarBox: { width: 34, height: 34 },
+                  },
+                }}
+              />
+            </>
+          ) : isLoaded ? (
+            <>
+              {/* Sign In link */}
+              <Link href="/sign-in" style={{
+                color: 'var(--text)', fontSize: 14, fontWeight: 500,
+                transition: 'color 0.2s', textDecoration: 'none',
+              }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--blue)')}
+                onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--text)')}
+              >
+                Sign In
+              </Link>
 
-          {/* Get Started button */}
-          <Link href="/sign-up" style={{
-            background: 'var(--blue)', color: 'var(--white)', padding: '9px 22px', borderRadius: 8,
-            fontWeight: 600, fontSize: 14, transition: 'all 0.2s', display: 'inline-block',
-          }}
-            onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--blue-dark)'; (e.target as HTMLElement).style.transform = 'translateY(-1px)'; }}
-            onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'var(--blue)'; (e.target as HTMLElement).style.transform = ''; }}
-          >
-            Get Started
-          </Link>
+              {/* Get Started button */}
+              <Link href="/sign-up" style={{
+                background: 'var(--blue)', color: 'var(--white)', padding: '9px 22px', borderRadius: 8,
+                fontWeight: 600, fontSize: 14, transition: 'all 0.2s', display: 'inline-block',
+              }}
+                onMouseEnter={(e) => { (e.target as HTMLElement).style.background = 'var(--blue-dark)'; (e.target as HTMLElement).style.transform = 'translateY(-1px)'; }}
+                onMouseLeave={(e) => { (e.target as HTMLElement).style.background = 'var(--blue)'; (e.target as HTMLElement).style.transform = ''; }}
+              >
+                Get Started
+              </Link>
+            </>
+          ) : null}
         </div>
       </div>
     </nav>
