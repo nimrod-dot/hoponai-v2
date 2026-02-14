@@ -1,10 +1,13 @@
 'use client';
 
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import Navbar from '@/components/Navbar';
 import Reveal from '@/components/Reveal';
 import CTASection from '@/components/CTASection';
 import Footer from '@/components/Footer';
+
+const SarahInfographic = dynamic(() => import('@/components/SarahInfographic'), { ssr: false });
 
 function Hero() {
   return (
@@ -62,17 +65,17 @@ function Problem() {
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         <Reveal>
           <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 38, color: 'var(--heading)', textAlign: 'center', margin: '0 0 8px' }}>
-            Corporate training hasn&apos;t changed in 20 years.
+            Your team is struggling. The data proves it.
           </h2>
           <p style={{ fontSize: 15, color: 'var(--muted)', textAlign: 'center', margin: '0 0 44px', maxWidth: 560, marginLeft: 'auto', marginRight: 'auto' }}>
-            Videos, PDFs, tooltips, and slide decks. None of them actually teach. Hoponai does.
+            Traditional training - videos, PDFs, slide decks - doesn&apos;t work. Hoponai does.
           </p>
         </Reveal>
         <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
           {[
-            { num: '$444B', label: 'Global training spend — growing every year', sub: 'Yet outcomes haven\'t improved.' },
-            { num: '70%', label: 'of training content forgotten in one week', sub: 'Passive learning doesn\'t stick.' },
-            { num: '52%', label: 'of employees say onboarding is just busywork', sub: 'They need hands-on guidance.' },
+            { num: '85%', label: 'of employees don\'t fully understand their SOPs', sub: 'Compliance risk hiding in plain sight.' },
+            { num: '70%', label: 'of training content is forgotten within a week', sub: 'Passive learning doesn\'t stick.' },
+            { num: '3-6 mo', label: 'average time for a new hire to reach full productivity', sub: 'That\'s months of lost output.' },
           ].map((s, i) => (
             <Reveal key={i} delay={i * 0.12} style={{ flex: '1 1 260px', maxWidth: 300 }}>
               <div style={{
@@ -94,16 +97,36 @@ function Problem() {
   );
 }
 
+function SarahDemo() {
+  return (
+    <section style={{ background: 'var(--bg)', padding: '88px 2rem', borderTop: '1px solid var(--border)' }}>
+      <div style={{ maxWidth: 960, margin: '0 auto' }}>
+        <Reveal>
+          <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 38, color: 'var(--heading)', textAlign: 'center', margin: '0 0 8px' }}>
+            Meet Sarah, your AI training guide.
+          </h2>
+          <p style={{ fontSize: 15, color: 'var(--muted)', textAlign: 'center', margin: '0 0 44px', maxWidth: 520, marginLeft: 'auto', marginRight: 'auto' }}>
+            Sarah lives inside your software and walks every employee through tasks in real-time - step by step, click by click.
+          </p>
+        </Reveal>
+        <Reveal delay={0.15}>
+          <SarahInfographic />
+        </Reveal>
+      </div>
+    </section>
+  );
+}
+
 function WhatWeDoSection() {
   const caps = [
-    { icon: '🧠', title: 'Learns your company', desc: 'Hoponai ingests your documentation, workflows, and processes. It understands how YOUR org operates — not generic instructions.' },
+    { icon: '🧠', title: 'Learns your company', desc: 'Hoponai ingests your documentation, workflows, and processes. It understands how YOUR org operates - not generic instructions.' },
     { icon: '💬', title: 'Converses naturally', desc: 'Employees interact via real-time voice and video. They ask questions, get explanations, and work through tasks conversationally.' },
-    { icon: '🖥️', title: 'Demonstrates live', desc: 'Hoponai navigates your actual software in real-time, showing each step in context — not a pre-recorded video.' },
+    { icon: '🖥️', title: 'Demonstrates live', desc: 'Hoponai navigates your actual software in real-time, showing each step in context - not a pre-recorded video.' },
     { icon: '⚡', title: 'Works alongside employees', desc: 'It clicks, fills forms, and operates software WITH your people. Hands-on guided learning, not passive watching.' },
   ];
 
   return (
-    <section style={{ background: 'var(--bg)', padding: '88px 2rem' }}>
+    <section style={{ background: 'var(--white)', padding: '88px 2rem', borderTop: '1px solid var(--border)' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         <Reveal>
           <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 38, color: 'var(--heading)', textAlign: 'center', margin: '0 0 8px' }}>
@@ -117,7 +140,7 @@ function WhatWeDoSection() {
           {caps.map((c, i) => (
             <Reveal key={i} delay={i * 0.1}>
               <div style={{
-                background: 'var(--white)', borderRadius: 12, padding: '24px 20px',
+                background: 'var(--bg)', borderRadius: 12, padding: '24px 20px',
                 border: '1px solid var(--border)', transition: 'all 0.3s', height: '100%',
               }}
                 onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--blue)'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 20px var(--blue-glow)'; }}
@@ -144,14 +167,14 @@ function Solutions() {
   ];
 
   return (
-    <section style={{ background: 'var(--white)', padding: '88px 2rem', borderTop: '1px solid var(--border)' }}>
+    <section style={{ background: 'var(--bg)', padding: '88px 2rem', borderTop: '1px solid var(--border)' }}>
       <div style={{ maxWidth: 960, margin: '0 auto' }}>
         <Reveal>
           <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 38, color: 'var(--heading)', textAlign: 'center', margin: '0 0 8px' }}>
             One platform. Every training need.
           </h2>
           <p style={{ fontSize: 15, color: 'var(--muted)', textAlign: 'center', margin: '0 0 44px' }}>
-            From day-one onboarding to ongoing compliance — Hoponai adapts.
+            From day-one onboarding to ongoing compliance - Hoponai adapts.
           </p>
         </Reveal>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 16 }}>
@@ -159,7 +182,7 @@ function Solutions() {
             <Reveal key={i} delay={i * 0.1}>
               <Link href={s.href} style={{ display: 'block', height: '100%' }}>
                 <div style={{
-                  background: 'var(--bg)', borderRadius: 12, padding: '24px 20px',
+                  background: 'var(--white)', borderRadius: 12, padding: '24px 20px',
                   border: '1px solid var(--border)', transition: 'all 0.3s', height: '100%',
                   cursor: 'pointer',
                 }}
@@ -182,7 +205,7 @@ function Solutions() {
 
 function Credibility() {
   return (
-    <section style={{ background: 'var(--bg)', padding: '80px 2rem' }}>
+    <section style={{ background: 'var(--white)', padding: '80px 2rem', borderTop: '1px solid var(--border)' }}>
       <div style={{ maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
         <Reveal>
           <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 30, color: 'var(--heading)', margin: '0 0 16px' }}>
@@ -211,6 +234,7 @@ export default function HomePage() {
       <Navbar />
       <Hero />
       <Problem />
+      <SarahDemo />
       <WhatWeDoSection />
       <Solutions />
       <Credibility />
