@@ -1,13 +1,16 @@
+'use client';
+
+import dynamic from 'next/dynamic';
 import SolutionPage from '@/components/SolutionPage';
 
-export const metadata = { title: 'SOPs & Compliance — Hoponai', description: 'Ensure every standard operating procedure is followed correctly with AI-guided training.' };
+const SOPsInfographic = dynamic(() => import('@/components/SOPsInfographic'), { ssr: false });
 
 export default function SOPsPage() {
   return (
     <SolutionPage
       badge="SOPs & Compliance"
       headline="Every procedure. Followed correctly. Every time."
-      subline="SOPs exist in PDFs no one reads. Compliance training is a checkbox exercise. Hoponai makes both interactive — walking employees through actual procedures in the actual systems."
+      subline="SOPs exist in PDFs no one reads. Compliance training is a checkbox exercise. Hoponai makes both interactive - walking employees through actual procedures in the actual systems."
       painSummary="Written SOPs don't guarantee correct execution."
       pains={[
         { stat: '60%', label: 'of employees admit they don\'t always follow documented SOPs' },
@@ -16,7 +19,7 @@ export default function SOPsPage() {
       ]}
       features={[
         { icon: '📋', title: 'Interactive SOP walkthroughs', desc: 'Instead of reading a 40-page doc, employees walk through each procedure step-by-step with Hoponai in the actual system.' },
-        { icon: '✅', title: 'Verify understanding', desc: 'Hoponai doesn\'t just present information — it checks comprehension, asks follow-up questions, and re-explains when needed.' },
+        { icon: '✅', title: 'Verify understanding', desc: 'Hoponai doesn\'t just present information - it checks comprehension, asks follow-up questions, and re-explains when needed.' },
         { icon: '📊', title: 'Completion tracking', desc: 'Real-time dashboards showing who has completed training, who\'s in progress, and who needs a nudge. Audit-ready.' },
         { icon: '🔒', title: 'Always up to date', desc: 'When a regulation changes, update the SOP once. Hoponai immediately retrains every affected employee on the new procedure.' },
       ]}
@@ -27,6 +30,7 @@ export default function SOPsPage() {
         { num: '03', title: 'Compliance verified', desc: 'Completion is tracked, understanding is verified, and you have an audit trail showing who was trained and when.' },
       ]}
       ctaLine="What if compliance training actually worked?"
+      infographic={<SOPsInfographic />}
     />
   );
 }

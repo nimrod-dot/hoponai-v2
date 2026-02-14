@@ -27,9 +27,10 @@ interface SolutionPageProps {
   howTitle: string;
   howSteps: { num: string; title: string; desc: string }[];
   ctaLine: string;
+  infographic?: React.ReactNode;
 }
 
-export default function SolutionPage({ badge, headline, subline, pains, painSummary, features, howTitle, howSteps, ctaLine }: SolutionPageProps) {
+export default function SolutionPage({ badge, headline, subline, pains, painSummary, features, howTitle, howSteps, ctaLine, infographic }: SolutionPageProps) {
   return (
     <>
       <Navbar />
@@ -53,25 +54,39 @@ export default function SolutionPage({ badge, headline, subline, pains, painSumm
           </Reveal>
           <Reveal delay={0.3}>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Link href="#cta" style={{
+              <Link href="/sign-up" style={{
                 background: 'var(--blue)', color: 'var(--white)', padding: '13px 28px', borderRadius: 10,
                 fontWeight: 600, fontSize: 15, display: 'inline-block',
-              }}>Get a Demo</Link>
-              <button style={{
+              }}>Get Started</Link>
+              <Link href="/contact-sales" style={{
                 background: 'var(--white)', color: 'var(--heading)', border: '1px solid var(--border)',
-                padding: '13px 28px', borderRadius: 10, fontWeight: 600, fontSize: 15, cursor: 'pointer',
+                padding: '13px 28px', borderRadius: 10, fontWeight: 600, fontSize: 15,
+                display: 'inline-block', textDecoration: 'none',
                 fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.2s',
-              }}
-                onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--blue)'; e.currentTarget.style.color = 'var(--blue)'; }}
-                onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.color = 'var(--heading)'; }}
-              >Watch Video ▶</button>
+              }}>Contact Sales</Link>
             </div>
           </Reveal>
         </div>
       </section>
 
+      {/* Infographic - shown between hero and pain points */}
+      {infographic && (
+        <section style={{ background: 'var(--white)', padding: '60px 2rem 80px', borderTop: '1px solid var(--border)' }}>
+          <div style={{ maxWidth: 960, margin: '0 auto' }}>
+            <Reveal>
+              <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 34, color: 'var(--heading)', textAlign: 'center', margin: '0 0 36px' }}>
+                See it in action
+              </h2>
+            </Reveal>
+            <Reveal delay={0.15}>
+              {infographic}
+            </Reveal>
+          </div>
+        </section>
+      )}
+
       {/* Pain points */}
-      <section style={{ background: 'var(--white)', padding: '80px 2rem', borderTop: '1px solid var(--border)' }}>
+      <section style={{ background: infographic ? 'var(--bg)' : 'var(--white)', padding: '80px 2rem', borderTop: '1px solid var(--border)' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <Reveal>
             <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 34, color: 'var(--heading)', textAlign: 'center', margin: '0 0 40px' }}>
@@ -82,7 +97,7 @@ export default function SolutionPage({ badge, headline, subline, pains, painSumm
             {pains.map((p, i) => (
               <Reveal key={i} delay={i * 0.1} style={{ flex: '1 1 220px', maxWidth: 280 }}>
                 <div style={{
-                  background: 'var(--bg)', borderRadius: 12, padding: '24px 20px', textAlign: 'center',
+                  background: infographic ? 'var(--white)' : 'var(--bg)', borderRadius: 12, padding: '24px 20px', textAlign: 'center',
                   border: '1px solid var(--border)', transition: 'all 0.3s',
                 }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--blue)'; e.currentTarget.style.transform = 'translateY(-3px)'; }}
@@ -98,7 +113,7 @@ export default function SolutionPage({ badge, headline, subline, pains, painSumm
       </section>
 
       {/* Features */}
-      <section style={{ background: 'var(--bg)', padding: '80px 2rem' }}>
+      <section style={{ background: infographic ? 'var(--white)' : 'var(--bg)', padding: '80px 2rem' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <Reveal>
             <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 34, color: 'var(--heading)', textAlign: 'center', margin: '0 0 40px' }}>
@@ -109,7 +124,7 @@ export default function SolutionPage({ badge, headline, subline, pains, painSumm
             {features.map((f, i) => (
               <Reveal key={i} delay={i * 0.1}>
                 <div style={{
-                  background: 'var(--white)', borderRadius: 12, padding: '24px 20px',
+                  background: infographic ? 'var(--bg)' : 'var(--white)', borderRadius: 12, padding: '24px 20px',
                   border: '1px solid var(--border)', transition: 'all 0.3s', height: '100%',
                 }}
                   onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--blue)'; e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 20px var(--blue-glow)'; }}
@@ -126,7 +141,7 @@ export default function SolutionPage({ badge, headline, subline, pains, painSumm
       </section>
 
       {/* How it works */}
-      <section style={{ background: 'var(--white)', padding: '80px 2rem', borderTop: '1px solid var(--border)' }}>
+      <section style={{ background: infographic ? 'var(--bg)' : 'var(--white)', padding: '80px 2rem', borderTop: '1px solid var(--border)' }}>
         <div style={{ maxWidth: 960, margin: '0 auto' }}>
           <Reveal>
             <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 34, color: 'var(--heading)', textAlign: 'center', margin: '0 0 40px' }}>
@@ -137,7 +152,7 @@ export default function SolutionPage({ badge, headline, subline, pains, painSumm
             {howSteps.map((s, i) => (
               <Reveal key={i} delay={i * 0.12} style={{ flex: '1 1 260px', maxWidth: 300 }}>
                 <div style={{
-                  background: 'var(--bg)', borderRadius: 12, padding: '28px 24px',
+                  background: infographic ? 'var(--white)' : 'var(--bg)', borderRadius: 12, padding: '28px 24px',
                   border: '1px solid var(--border)', height: '100%', transition: 'all 0.3s',
                 }}
                   onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-3px)'; e.currentTarget.style.boxShadow = '0 6px 20px rgba(0,0,0,0.06)'; }}
@@ -154,22 +169,23 @@ export default function SolutionPage({ badge, headline, subline, pains, painSumm
       </section>
 
       {/* Inline CTA */}
-      <section style={{ background: 'var(--bg)', padding: '48px 2rem' }}>
+      <section style={{ background: infographic ? 'var(--white)' : 'var(--bg)', padding: '48px 2rem' }}>
         <div style={{ maxWidth: 600, margin: '0 auto', textAlign: 'center' }}>
           <Reveal>
             <p style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 22, color: 'var(--heading)', lineHeight: 1.5, margin: '0 0 20px' }}>
               {ctaLine}
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-              <Link href="#cta" style={{
+              <Link href="/sign-up" style={{
                 background: 'var(--blue)', color: 'var(--white)', padding: '12px 24px', borderRadius: 8,
                 fontWeight: 600, fontSize: 14, display: 'inline-block',
-              }}>Get a Demo</Link>
-              <button style={{
+              }}>Get Started - Free</Link>
+              <Link href="/contact-sales" style={{
                 background: 'var(--white)', color: 'var(--heading)', border: '1px solid var(--border)',
-                padding: '12px 24px', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer',
+                padding: '12px 24px', borderRadius: 8, fontWeight: 600, fontSize: 14,
+                display: 'inline-block', textDecoration: 'none',
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
-              }}>Watch Video ▶</button>
+              }}>Contact Sales</Link>
             </div>
           </Reveal>
         </div>

@@ -1,13 +1,16 @@
+'use client';
+
+import dynamic from 'next/dynamic';
 import SolutionPage from '@/components/SolutionPage';
 
-export const metadata = { title: 'Customer Training — Hoponai', description: 'Onboard and educate your customers interactively with AI.' };
+const CustomerInfographic = dynamic(() => import('@/components/CustomerInfographic'), { ssr: false });
 
 export default function CustomersPage() {
   return (
     <SolutionPage
       badge="Customer Training"
       headline="Your customers struggle with your product too."
-      subline="If your employees need interactive training on complex software, so do your customers. Hoponai onboards and educates them the same way — hands-on, patient, and personalized."
+      subline="If your employees need interactive training on complex software, so do your customers. Hoponai onboards and educates them the same way - hands-on, patient, and personalized."
       painSummary="Poor customer onboarding kills retention."
       pains={[
         { stat: '67%', label: 'of customer churn is due to poor onboarding and adoption' },
@@ -27,6 +30,7 @@ export default function CustomersPage() {
         { num: '03', title: 'Higher adoption, lower churn', desc: 'Customers who truly understand your product stay longer, expand faster, and create fewer support tickets.' },
       ]}
       ctaLine="What if every customer had a dedicated product expert?"
+      infographic={<CustomerInfographic />}
     />
   );
 }
