@@ -1,281 +1,203 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
+import { useState } from 'react';
 import Navbar from '@/components/Navbar';
+import Reveal from '@/components/Reveal';
 import Footer from '@/components/Footer';
 
-const PLANS = [
+const plans = [
   {
-    name: 'Trial',
+    name: 'Free Trial',
     price: '$0',
     period: '14 days',
-    description: 'Try the full platform risk-free',
-    features: [
-      'Full feature access',
-      'Up to 5 users',
-      '2 walkthroughs',
-      '5 AI training runs',
-      'Basic analytics',
-      'Community support',
-    ],
+    desc: 'Try Hoponai with your team. No credit card required.',
     cta: 'Start Free Trial',
-    href: '/sign-up',
+    ctaHref: '/sign-up',
     highlight: false,
+    features: [
+      'Up to 5 team members',
+      '3 walkthroughs',
+      'Sarah AI assistant',
+      'Chrome extension',
+      'Basic analytics',
+      'Email support',
+    ],
+    missing: [
+      'Custom branding',
+      'SSO / SAML',
+      'API access',
+      'Dedicated CSM',
+    ],
   },
   {
     name: 'Pro',
     price: '$12',
-    period: 'per seat/month',
-    description: 'For growing teams that need AI-powered training',
-    features: [
-      'Up to 100 users',
-      'Unlimited walkthroughs',
-      '100 AI training runs/month',
-      'Advanced analytics',
-      'Priority support',
-      'Custom branding',
-      'SSO/SAML (add-on)',
-    ],
-    cta: 'Start Pro Trial',
-    href: '/sign-up?plan=pro',
+    period: 'per seat / month',
+    desc: 'For teams ready to scale interactive training across the org.',
+    cta: 'Get Started',
+    ctaHref: '/sign-up',
     highlight: true,
+    features: [
+      'Unlimited team members',
+      'Unlimited walkthroughs',
+      'Sarah AI assistant',
+      'Chrome extension',
+      'Advanced analytics',
+      'Priority email support',
+      'Team management',
+      'Custom branding',
+      'Walkthrough templates',
+      'Completion certificates',
+    ],
+    missing: [
+      'SSO / SAML',
+      'API access',
+      'Dedicated CSM',
+    ],
   },
   {
     name: 'Enterprise',
     price: 'Custom',
-    period: 'contact sales',
-    description: 'For organizations that need dedicated support',
-    features: [
-      'Unlimited users',
-      'Unlimited walkthroughs',
-      'Unlimited AI training runs',
-      'Custom analytics & reporting',
-      'Dedicated customer success manager',
-      'White-label branding',
-      'SSO/SAML included',
-      'Custom integrations',
-      'SLA guarantee',
-    ],
+    period: 'annual contract',
+    desc: 'For organizations that need security, compliance, and scale.',
     cta: 'Contact Sales',
-    href: '/contact-sales',
+    ctaHref: '/contact-sales',
     highlight: false,
+    features: [
+      'Everything in Pro',
+      'SSO / SAML authentication',
+      'API access & webhooks',
+      'Dedicated Customer Success Manager',
+      'Custom integrations',
+      'SLA guarantee (99.9% uptime)',
+      'Audit logs & compliance reports',
+      'Advanced role-based access control',
+      'Onboarding & implementation support',
+      'Volume pricing',
+    ],
+    missing: [],
   },
 ];
 
 export default function PricingPage() {
-  const [annual, setAnnual] = useState(false);
+  const [annual, setAnnual] = useState(true);
+  const proPrice = annual ? '$10' : '$12';
+  const proSuffix = annual ? 'per seat / month, billed annually' : 'per seat / month';
 
   return (
     <>
       <Navbar />
-      
-      <section style={{
-        minHeight: '100vh', background: 'var(--bg)', padding: '140px 2rem 80px',
-      }}>
-        <div style={{ maxWidth: 1120, margin: '0 auto' }}>
-          {/* Header */}
-          <div style={{ textAlign: 'center', marginBottom: 56 }}>
-            <h1 style={{
-              fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 48,
-              color: 'var(--heading)', marginBottom: 12, fontWeight: 400,
-            }}>
-              Simple, transparent pricing
+
+      <section style={{ background: 'var(--bg)', padding: '140px 1.5rem 80px', textAlign: 'center', position: 'relative' }}>
+        <div style={{ position: 'absolute', inset: 0, opacity: 0.3, backgroundImage: 'radial-gradient(var(--border) 1px, transparent 1px)', backgroundSize: '32px 32px' }} />
+        <div style={{ position: 'relative', zIndex: 1, maxWidth: 600, margin: '0 auto' }}>
+          <Reveal>
+            <h1 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 'clamp(36px, 5vw, 48px)', fontWeight: 400, color: 'var(--heading)', margin: '0 0 12px', lineHeight: 1.15 }}>
+              Simple, transparent pricing.
             </h1>
-            <p style={{ fontSize: 18, color: 'var(--text)', marginBottom: 32, maxWidth: 600, margin: '0 auto 32px' }}>
-              Start with a free trial. Scale as you grow. Enterprise-ready from day one.
+          </Reveal>
+          <Reveal delay={0.1}>
+            <p style={{ fontSize: 17, color: 'var(--text)', margin: '0 auto 28px', maxWidth: 420 }}>
+              Start free. Scale when you&apos;re ready. Every learner gets a personal AI trainer.
             </p>
-
-            {/* Billing toggle */}
-            <div style={{
-              display: 'inline-flex', alignItems: 'center', gap: 12,
-              padding: 4, background: 'var(--white)', borderRadius: 8,
-              border: '1px solid var(--border)',
-            }}>
-              <button
-                onClick={() => setAnnual(false)}
-                style={{
-                  padding: '8px 20px', borderRadius: 6, border: 'none',
-                  background: !annual ? 'var(--blue)' : 'transparent',
-                  color: !annual ? 'var(--white)' : 'var(--text)',
-                  fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                  transition: 'all 0.2s', fontFamily: "'Plus Jakarta Sans', sans-serif",
-                }}
-              >
-                Monthly
-              </button>
-              <button
-                onClick={() => setAnnual(true)}
-                style={{
-                  padding: '8px 20px', borderRadius: 6, border: 'none',
-                  background: annual ? 'var(--blue)' : 'transparent',
-                  color: annual ? 'var(--white)' : 'var(--text)',
-                  fontSize: 14, fontWeight: 600, cursor: 'pointer',
-                  transition: 'all 0.2s', fontFamily: "'Plus Jakarta Sans', sans-serif",
-                }}
-              >
-                Annual <span style={{ fontSize: 12, opacity: 0.8 }}>(save 20%)</span>
-              </button>
+          </Reveal>
+          <Reveal delay={0.2}>
+            <div style={{ display: 'inline-flex', background: 'var(--white)', borderRadius: 10, border: '1px solid var(--border)', padding: 4 }}>
+              <button onClick={() => setAnnual(false)} style={{
+                padding: '8px 20px', borderRadius: 8, border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                background: !annual ? 'var(--blue)' : 'transparent', color: !annual ? '#fff' : 'var(--text)',
+                fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.2s',
+              }}>Monthly</button>
+              <button onClick={() => setAnnual(true)} style={{
+                padding: '8px 20px', borderRadius: 8, border: 'none', fontSize: 14, fontWeight: 600, cursor: 'pointer',
+                background: annual ? 'var(--blue)' : 'transparent', color: annual ? '#fff' : 'var(--text)',
+                fontFamily: "'Plus Jakarta Sans', sans-serif", transition: 'all 0.2s',
+              }}>Annual <span style={{ fontSize: 11, opacity: 0.8 }}>Save 17%</span></button>
             </div>
-          </div>
+          </Reveal>
+        </div>
+      </section>
 
-          {/* Plans */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
-            gap: 24,
-            marginBottom: 64,
-          }}>
-            {PLANS.map((plan) => (
-              <div
-                key={plan.name}
-                style={{
-                  background: 'var(--white)',
-                  border: plan.highlight ? '2px solid var(--blue)' : '1px solid var(--border)',
-                  borderRadius: 16,
-                  padding: 32,
-                  position: 'relative',
-                  transition: 'all 0.3s',
-                  boxShadow: plan.highlight ? '0 8px 32px rgba(14,165,233,0.15)' : 'none',
-                }}
-              >
+      <section style={{ background: 'var(--white)', padding: '0 1.5rem 80px', borderTop: '1px solid var(--border)' }}>
+        <div style={{ maxWidth: 1060, margin: '-40px auto 0', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+          {plans.map((plan, i) => (
+            <Reveal key={i} delay={i * 0.1}>
+              <div style={{
+                background: 'var(--white)', borderRadius: 16, padding: '32px 24px',
+                border: plan.highlight ? '2px solid var(--blue)' : '1px solid var(--border)',
+                position: 'relative', height: '100%', display: 'flex', flexDirection: 'column',
+                boxShadow: plan.highlight ? '0 8px 32px rgba(14,165,233,0.12)' : '0 2px 8px rgba(0,0,0,0.04)',
+              }}>
                 {plan.highlight && (
                   <div style={{
                     position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
-                    background: 'var(--blue)', color: 'var(--white)',
-                    padding: '4px 16px', borderRadius: 20, fontSize: 12, fontWeight: 600,
-                  }}>
-                    Most Popular
-                  </div>
+                    background: 'var(--blue)', color: '#fff', padding: '4px 16px', borderRadius: 20,
+                    fontSize: 12, fontWeight: 700,
+                  }}>Most Popular</div>
                 )}
 
-                <div style={{ marginBottom: 24 }}>
-                  <h3 style={{
-                    fontSize: 20, fontWeight: 700, color: 'var(--heading)',
-                    marginBottom: 8, fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  }}>
-                    {plan.name}
-                  </h3>
-                  <p style={{ fontSize: 14, color: 'var(--muted)', marginBottom: 16 }}>
-                    {plan.description}
-                  </p>
-                  
-                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
-                    <span style={{
-                      fontSize: 40, fontWeight: 700, color: 'var(--heading)',
-                      fontFamily: "'Plus Jakarta Sans', sans-serif",
-                    }}>
-                      {plan.price === '$0' || plan.price === 'Custom' ? plan.price : 
-                        annual && plan.price !== 'Custom' ? 
-                        `$${Math.round(parseInt(plan.price.slice(1)) * 0.8)}` : 
-                        plan.price}
-                    </span>
-                    {plan.period && (
-                      <span style={{ fontSize: 14, color: 'var(--muted)' }}>
-                        /{plan.period}
-                      </span>
-                    )}
-                  </div>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--blue)', marginBottom: 4 }}>{plan.name}</div>
+                <div style={{ display: 'flex', alignItems: 'baseline', gap: 4, marginBottom: 4 }}>
+                  <span style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 44, color: 'var(--heading)' }}>
+                    {plan.name === 'Pro' ? proPrice : plan.price}
+                  </span>
                 </div>
+                <div style={{ fontSize: 13, color: 'var(--muted)', marginBottom: 8 }}>
+                  {plan.name === 'Pro' ? proSuffix : plan.period}
+                </div>
+                <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.5, marginBottom: 24 }}>{plan.desc}</p>
 
-                <ul style={{
-                  listStyle: 'none', padding: 0, margin: '0 0 28px',
-                  display: 'flex', flexDirection: 'column', gap: 12,
-                }}>
-                  {plan.features.map((feature) => (
-                    <li key={feature} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" style={{ flexShrink: 0, marginTop: 2 }}>
-                        <circle cx="10" cy="10" r="10" fill="rgba(14,165,233,0.1)" />
-                        <path d="M6 10L9 13L14 7" stroke="var(--blue)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                      <span style={{ fontSize: 14, color: 'var(--text)' }}>{feature}</span>
-                    </li>
+                <Link href={plan.ctaHref} style={{
+                  display: 'block', textAlign: 'center', padding: '12px 24px', borderRadius: 10,
+                  fontWeight: 600, fontSize: 15, marginBottom: 24,
+                  background: plan.highlight ? 'var(--blue)' : 'var(--bg)',
+                  color: plan.highlight ? '#fff' : 'var(--heading)',
+                  border: plan.highlight ? 'none' : '1px solid var(--border)',
+                }}>{plan.cta}</Link>
+
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, flex: 1 }}>
+                  {plan.features.map((f, j) => (
+                    <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 14, color: 'var(--text)' }}>
+                      <span style={{ color: 'var(--blue)', fontSize: 15, flexShrink: 0, marginTop: 1 }}>✓</span>
+                      <span>{f}</span>
+                    </div>
                   ))}
-                </ul>
-
-                <Link
-                  href={plan.href}
-                  style={{
-                    display: 'block', width: '100%', textAlign: 'center',
-                    padding: '12px 24px', borderRadius: 8,
-                    background: plan.highlight ? 'var(--blue)' : 'var(--white)',
-                    color: plan.highlight ? 'var(--white)' : 'var(--blue)',
-                    border: plan.highlight ? 'none' : '2px solid var(--blue)',
-                    fontSize: 15, fontWeight: 600, textDecoration: 'none',
-                    transition: 'all 0.2s', fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  }}
-                  onMouseEnter={(e) => {
-                    if (plan.highlight) {
-                      (e.target as HTMLElement).style.background = 'var(--blue-dark)';
-                    } else {
-                      (e.target as HTMLElement).style.background = 'var(--blue)';
-                      (e.target as HTMLElement).style.color = 'var(--white)';
-                    }
-                  }}
-                  onMouseLeave={(e) => {
-                    if (plan.highlight) {
-                      (e.target as HTMLElement).style.background = 'var(--blue)';
-                    } else {
-                      (e.target as HTMLElement).style.background = 'var(--white)';
-                      (e.target as HTMLElement).style.color = 'var(--blue)';
-                    }
-                  }}
-                >
-                  {plan.cta}
-                </Link>
-              </div>
-            ))}
-          </div>
-
-          {/* FAQ Section */}
-          <div style={{ maxWidth: 720, margin: '0 auto', paddingTop: 40, borderTop: '1px solid var(--border)' }}>
-            <h2 style={{
-              fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 32,
-              color: 'var(--heading)', textAlign: 'center', marginBottom: 32,
-            }}>
-              Frequently asked questions
-            </h2>
-
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              {[
-                {
-                  q: 'What happens after my trial ends?',
-                  a: 'After 14 days, you\'ll need to select a paid plan to continue. Your data is preserved for 30 days if you need more time to decide.',
-                },
-                {
-                  q: 'Can I change plans later?',
-                  a: 'Yes. Upgrade or downgrade anytime. Changes take effect immediately, with prorated billing.',
-                },
-                {
-                  q: 'What counts as an AI training run?',
-                  a: 'Each time an employee completes an interactive AI-guided training session. Paused or incomplete sessions don\'t count.',
-                },
-                {
-                  q: 'Do you offer discounts for nonprofits or education?',
-                  a: 'Yes. Contact sales for custom pricing for qualified organizations.',
-                },
-                {
-                  q: 'What if I need more than 100 AI runs per month on Pro?',
-                  a: 'Upgrade to Enterprise for unlimited runs, or purchase additional run packs at $0.10/run.',
-                },
-              ].map((faq, i) => (
-                <div key={i} style={{
-                  padding: 20, background: 'var(--white)', borderRadius: 12,
-                  border: '1px solid var(--border)',
-                }}>
-                  <h3 style={{
-                    fontSize: 16, fontWeight: 600, color: 'var(--heading)',
-                    marginBottom: 8, fontFamily: "'Plus Jakarta Sans', sans-serif",
-                  }}>
-                    {faq.q}
-                  </h3>
-                  <p style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6, margin: 0 }}>
-                    {faq.a}
-                  </p>
+                  {plan.missing.map((f, j) => (
+                    <div key={j} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 14, color: 'var(--muted)' }}>
+                      <span style={{ fontSize: 15, flexShrink: 0, marginTop: 1 }}>—</span>
+                      <span>{f}</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
-          </div>
+              </div>
+            </Reveal>
+          ))}
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section style={{ background: 'var(--bg)', padding: '80px 1.5rem', borderTop: '1px solid var(--border)' }}>
+        <div style={{ maxWidth: 640, margin: '0 auto' }}>
+          <Reveal>
+            <h2 style={{ fontFamily: "'Instrument Serif', Georgia, serif", fontSize: 30, color: 'var(--heading)', textAlign: 'center', margin: '0 0 40px' }}>
+              Common questions
+            </h2>
+          </Reveal>
+          {[
+            { q: 'What counts as a seat?', a: 'Every person who completes a walkthrough (learner) requires a seat. Admins who only create walkthroughs are included free.' },
+            { q: 'Can I switch plans later?', a: 'Yes. You can upgrade or downgrade at any time. Changes take effect on your next billing cycle.' },
+            { q: 'What happens after the free trial?', a: 'After 14 days, you can choose a paid plan or your account pauses. No data is deleted for 30 days.' },
+            { q: 'Do you offer volume discounts?', a: 'Yes. Organizations with 100+ seats qualify for volume pricing. Contact sales for a custom quote.' },
+            { q: 'What payment methods do you accept?', a: 'We accept all major credit cards. Enterprise customers can pay via invoice with net-30 terms.' },
+          ].map((faq, i) => (
+            <Reveal key={i} delay={i * 0.05}>
+              <div style={{ background: 'var(--white)', borderRadius: 12, padding: '20px 24px', border: '1px solid var(--border)', marginBottom: 12 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--heading)', marginBottom: 6 }}>{faq.q}</div>
+                <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.6 }}>{faq.a}</div>
+              </div>
+            </Reveal>
+          ))}
         </div>
       </section>
 
