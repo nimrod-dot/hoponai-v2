@@ -78,6 +78,21 @@ async function init() {
   headerUser.style.display = '';
   panelChat.style.display  = 'flex';
 
+  // Auto-generate a Bearer token if none stored (auth succeeded via Clerk cookie)
+  let token = await getStoredToken();
+  if (!token) {
+    try {
+      const tokenRes = await fetch(`${APP_URL}/api/extension/token`, {
+        method: 'POST',
+        credentials: 'include',
+      });
+      if (tokenRes.ok) {
+        const tokenData = await tokenRes.json();
+        await chrome.storage.local.set({ extension_token: tokenData.token });
+      }
+    } catch { /* proceed without token — Sarah shows static fallback */ }
+  }
+
   const state = await bg('GET_STATE');
   recordingState = { recording: state.recording || false, stepCount: state.stepCount || 0 };
 
@@ -91,7 +106,11 @@ init();
 // ─── Sarah API ────────────────────────────────────────────────────────────────
 async function askSarah(userMessage) {
   const token = await getStoredToken();
-  if (!token) return;
+  if (!token) {
+    if (userMessage) appendUserBubble(userMessage);
+    appendSarahBubble(getFallbackGreeting((authData?.user?.name || 'there').split(' ')[0]), getDefaultActions());
+    return;
+  }
 
   if (userMessage) {
     chatHistory.push({ role: 'user', content: userMessage });
@@ -141,7 +160,10 @@ async function askSarah(userMessage) {
 
 async function sarahGreet(firstName, orgName) {
   const token = await getStoredToken();
-  if (!token) return;
+  if (!token) {
+    appendSarahBubble(getFallbackGreeting(firstName), getDefaultActions());
+    return;
+  }
 
   const typingEl = appendTyping();
 
