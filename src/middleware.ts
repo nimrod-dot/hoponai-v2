@@ -22,6 +22,7 @@ const isPublicRoute = createRouteMatcher([
   '/dashboard/extension/auth',
   '/dashboard/extension/walkthroughs',
   '/api/extension/token',
+  '/api/sarah/chat',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {

@@ -3,256 +3,224 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Hoponai Recorder</title>
+  <title>Hoponai · Sarah</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      width: 320px;
+      width: 340px;
+      height: 560px;
+      display: flex;
+      flex-direction: column;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
       font-size: 14px;
       color: #1A1D26;
-      background: #FAFBFD;
+      background: #F8FAFC;
+      overflow: hidden;
     }
 
     /* ── Header ── */
     .header {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 16px;
-      background: #fff;
-      border-bottom: 1px solid #E8ECF2;
-    }
-    .logo {
-      font-family: Georgia, serif;
-      font-size: 18px;
-      color: #1A1D26;
-    }
-    .logo span { color: #0EA5E9; }
-
-    /* ── Panels ── */
-    .panel { padding: 16px; }
-
-    /* ── Auth ── */
-    #panel-loading { text-align: center; padding: 32px 16px; color: #8B92A5; }
-    #panel-login { text-align: center; padding: 24px 16px; }
-    #panel-login p { color: #8B92A5; margin-bottom: 12px; line-height: 1.5; }
-
-    /* ── User info ── */
-    .user-row {
-      display: flex;
-      align-items: center;
       justify-content: space-between;
-      padding: 10px 16px;
-      background: rgba(14,165,233,0.05);
-      border-bottom: 1px solid #E8ECF2;
-    }
-    .user-name { font-weight: 600; font-size: 13px; }
-    .user-org { font-size: 12px; color: #8B92A5; }
-    .badge-role {
-      font-size: 11px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 10px;
-      background: #E0F2FE;
-      color: #0EA5E9;
-    }
-
-    /* ── Not-on-GanttPRO warning ── */
-    #panel-wrong-site {
-      padding: 24px 16px;
-      text-align: center;
-    }
-    #panel-wrong-site p { color: #8B92A5; line-height: 1.5; }
-
-    /* ── Recording controls ── */
-    #panel-record { padding: 16px; }
-    .status-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 10px 12px;
+      padding: 10px 14px;
       background: #fff;
-      border: 1px solid #E8ECF2;
-      border-radius: 8px;
-      margin-bottom: 12px;
-      font-size: 13px;
-      color: #8B92A5;
-    }
-    .status-bar.recording { border-color: #EF4444; background: #FEF2F2; color: #991B1B; }
-    .dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: #D1D5DB;
+      border-bottom: 1px solid #E8ECF2;
       flex-shrink: 0;
     }
-    .dot.pulse {
-      background: #EF4444;
+    .logo { font-family: Georgia, serif; font-size: 16px; color: #1A1D26; }
+    .logo span { color: #0EA5E9; }
+    .header-user { font-size: 12px; color: #8B92A5; text-align: right; line-height: 1.4; }
+    .header-user strong { color: #1A1D26; display: block; }
+
+    /* ── Login panel ── */
+    #panel-login {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px 20px;
+      gap: 12px;
+    }
+    #panel-login p { font-size: 13px; color: #8B92A5; text-align: center; line-height: 1.6; }
+
+    /* ── Chat area ── */
+    #chat-area {
+      flex: 1;
+      overflow-y: auto;
+      padding: 14px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      scroll-behavior: smooth;
+    }
+
+    /* ── Message bubbles ── */
+    .msg { display: flex; align-items: flex-end; gap: 8px; max-width: 100%; }
+    .msg.sarah { align-self: flex-start; }
+    .msg.user  { align-self: flex-end; flex-direction: row-reverse; }
+
+    .avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background: linear-gradient(135deg, #0EA5E9, #6366F1);
+      color: #fff; font-size: 12px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .bubble {
+      padding: 10px 12px;
+      border-radius: 16px;
+      font-size: 13px;
+      line-height: 1.55;
+      max-width: 240px;
+    }
+    .msg.sarah .bubble {
+      background: #fff; border: 1px solid #E8ECF2;
+      border-bottom-left-radius: 4px; color: #1A1D26;
+    }
+    .msg.user .bubble {
+      background: #0EA5E9; color: #fff; border-bottom-right-radius: 4px;
+    }
+
+    /* ── Typing indicator ── */
+    .typing-dots { display: flex; gap: 4px; padding: 6px 2px; }
+    .typing-dots span {
+      width: 6px; height: 6px; border-radius: 50%; background: #CBD5E1;
+      animation: bounce 1.2s infinite;
+    }
+    .typing-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce { 0%,80%,100% { transform:scale(1);opacity:.6; } 40% { transform:scale(1.3);opacity:1; } }
+
+    /* ── Action chips ── */
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; padding-left: 36px; }
+    .chip {
+      padding: 5px 12px; border-radius: 16px; font-size: 12px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid #0EA5E9; background: #fff; color: #0EA5E9;
+      transition: background 0.12s, color 0.12s;
+    }
+    .chip:hover { background: #0EA5E9; color: #fff; }
+    .chip.danger { border-color: #EF4444; color: #EF4444; }
+    .chip.danger:hover { background: #EF4444; color: #fff; }
+
+    /* ── Inline save form ── */
+    .save-form {
+      background: #fff; border: 1px solid #E8ECF2;
+      border-radius: 12px; border-bottom-left-radius: 4px;
+      padding: 12px; max-width: 260px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .save-form label { font-size: 11px; font-weight: 600; color: #4A5168; }
+    .save-form input, .save-form textarea {
+      width: 100%; padding: 7px 9px; border: 1px solid #E8ECF2; border-radius: 6px;
+      font-size: 12px; color: #1A1D26; outline: none; font-family: inherit;
+    }
+    .save-form input:focus, .save-form textarea:focus { border-color: #0EA5E9; }
+    .save-form textarea { resize: none; min-height: 48px; }
+    .save-form .btn-save {
+      background: #0EA5E9; color: #fff; border: none; border-radius: 7px;
+      padding: 7px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    .save-form .btn-save:disabled { opacity: 0.6; cursor: wait; }
+
+    /* ── Recording badge ── */
+    .recording-badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 12px; font-weight: 600; color: #991B1B;
+      background: #FEF2F2; border: 1px solid #FECACA;
+      border-radius: 20px; padding: 3px 10px;
+    }
+    .rec-dot {
+      width: 7px; height: 7px; border-radius: 50%; background: #EF4444;
       animation: pulse 1.2s infinite;
     }
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0.3; }
-    }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
 
-    /* ── Save form ── */
-    #panel-save { padding: 16px; }
-    label { display: block; font-size: 12px; font-weight: 600; color: #4A5168; margin-bottom: 4px; margin-top: 12px; }
-    label:first-child { margin-top: 0; }
-    input[type="text"], textarea, select {
-      width: 100%;
-      padding: 8px 10px;
-      border: 1px solid #E8ECF2;
-      border-radius: 6px;
-      font-size: 13px;
-      color: #1A1D26;
-      background: #fff;
-      outline: none;
+    /* ── Input bar ── */
+    .input-bar {
+      display: flex; align-items: center; gap: 8px;
+      padding: 10px 12px; background: #fff; border-top: 1px solid #E8ECF2;
+      flex-shrink: 0;
     }
-    input[type="text"]:focus, textarea:focus, select:focus {
-      border-color: #0EA5E9;
+    #msg-input {
+      flex: 1; padding: 8px 12px; border: 1px solid #E8ECF2; border-radius: 20px;
+      font-size: 13px; outline: none; background: #F8FAFC; color: #1A1D26;
     }
-    textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+    #msg-input:focus { border-color: #0EA5E9; background: #fff; }
+    #btn-send {
+      width: 34px; height: 34px; border-radius: 50%; background: #0EA5E9;
+      border: none; cursor: pointer; display: flex; align-items: center;
+      justify-content: center; flex-shrink: 0; transition: opacity 0.15s;
+    }
+    #btn-send:hover { opacity: 0.85; }
+    #btn-send svg { width: 16px; height: 16px; fill: #fff; }
 
-    /* ── Buttons ── */
+    /* ── Generic buttons ── */
     .btn {
-      display: block;
-      width: 100%;
-      padding: 10px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      cursor: pointer;
-      border: none;
-      transition: opacity 0.15s;
-      text-align: center;
-      text-decoration: none;
+      display: block; width: 100%; padding: 10px; border-radius: 8px;
+      font-size: 14px; font-weight: 600; cursor: pointer; border: none; text-align: center;
     }
-    .btn:hover { opacity: 0.85; }
-    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .btn-primary { background: #0EA5E9; color: #fff; }
-    .btn-danger  { background: #EF4444; color: #fff; }
     .btn-ghost   { background: #E8ECF2; color: #1A1D26; }
-    .btn + .btn  { margin-top: 8px; }
-
-    /* ── Result ── */
-    #panel-result { padding: 24px 16px; text-align: center; }
-    #panel-result .icon { font-size: 32px; margin-bottom: 8px; }
-    #panel-result p { color: #8B92A5; margin-bottom: 16px; line-height: 1.5; }
-
-    /* ── Footer ── */
-    .footer {
-      padding: 10px 16px;
-      border-top: 1px solid #E8ECF2;
-      font-size: 11px;
-      color: #8B92A5;
-      text-align: center;
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .inp {
+      width: 100%; padding: 9px 10px; border: 1px solid #E8ECF2; border-radius: 8px;
+      font-size: 13px; color: #1A1D26; background: #fff; outline: none;
     }
-    .footer a { color: #0EA5E9; text-decoration: none; }
+    .inp:focus { border-color: #0EA5E9; }
+    .err { font-size: 12px; color: #EF4444; text-align: center; }
+    .divider {
+      display: flex; align-items: center; gap: 8px; width: 100%;
+      font-size: 12px; color: #8B92A5;
+    }
+    .divider::before, .divider::after { content:''; flex:1; height:1px; background:#E8ECF2; }
   </style>
 </head>
 <body>
 
-  <!-- Header -->
+  <!-- Header (always visible) -->
   <div class="header">
-    <img src="icons/icon48.png" width="20" height="20" alt="" />
-    <div class="logo">hopon<span>ai</span></div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <img src="icons/icon48.png" width="18" height="18" alt="" />
+      <div class="logo">hopon<span>ai</span></div>
+    </div>
+    <div class="header-user" id="header-user" style="display:none">
+      <strong id="hdr-name"></strong>
+      <span id="hdr-org"></span>
+    </div>
   </div>
 
   <!-- Loading -->
-  <div id="panel-loading" class="panel">Checking authentication…</div>
+  <div id="panel-loading" style="flex:1;display:flex;align-items:center;justify-content:center;color:#8B92A5;font-size:13px">
+    Connecting to Sarah…
+  </div>
 
-  <!-- Not logged in -->
-  <div id="panel-login" class="panel" style="display:none">
-    <p style="color:#8B92A5;line-height:1.6;margin-bottom:12px">
-      Paste your connection token from the Hoponai dashboard.
+  <!-- Login panel (pre-auth) -->
+  <div id="panel-login" style="display:none;flex:1;flex-direction:column;align-items:center;justify-content:center;padding:24px 20px;gap:12px">
+    <p style="font-size:13px;color:#8B92A5;text-align:center;line-height:1.6">
+      Paste your connection token from the Hoponai dashboard to connect Sarah.
     </p>
-    <input
-      id="inp-token"
-      type="text"
-      placeholder="Paste connection token…"
-      style="width:100%;padding:9px 10px;border:1px solid #E8ECF2;border-radius:8px;font-size:13px;color:#1A1D26;background:#fff;outline:none;margin-bottom:8px;display:block;"
-    />
+    <input id="inp-token" class="inp" type="text" placeholder="Paste connection token…" />
     <button id="btn-connect" class="btn btn-primary">Connect</button>
-    <p id="token-error" style="color:#EF4444;font-size:12px;margin-top:6px;display:none"></p>
-
-    <div style="margin:14px 0;display:flex;align-items:center;gap:8px">
-      <div style="flex:1;height:1px;background:#E8ECF2"></div>
-      <span style="font-size:12px;color:#8B92A5">or</span>
-      <div style="flex:1;height:1px;background:#E8ECF2"></div>
-    </div>
-    <a id="btn-login" href="https://hoponai.com/dashboard/extension" class="btn btn-ghost" target="_blank">
+    <p id="token-error" class="err" style="display:none"></p>
+    <div class="divider">or</div>
+    <a id="btn-login" href="https://hoponai.com/dashboard/extension" class="btn btn-ghost" target="_blank" style="text-decoration:none">
       Get token from dashboard ↗
     </a>
-    <button id="btn-retry" class="btn btn-ghost" style="margin-top:6px">Retry</button>
+    <button id="btn-retry" class="btn btn-ghost">Retry</button>
   </div>
 
-  <!-- Logged in: user info row -->
-  <div id="user-row" class="user-row" style="display:none">
-    <div>
-      <div class="user-name" id="user-name"></div>
-      <div class="user-org" id="user-org"></div>
+  <!-- Sarah chat (post-auth) -->
+  <div id="panel-chat" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+    <div id="chat-area"></div>
+    <div class="input-bar">
+      <input id="msg-input" type="text" placeholder="Ask Sarah anything…" />
+      <button id="btn-send">
+        <svg viewBox="0 0 24 24"><path d="M2 21L23 12 2 3v7l15 2-15 2z"/></svg>
+      </button>
     </div>
-    <div class="badge-role" id="user-role"></div>
-  </div>
-
-  <!-- Wrong site -->
-  <div id="panel-wrong-site" style="display:none">
-    <p>Navigate to <strong>app.ganttpro.com</strong> to start recording.</p>
-  </div>
-
-  <!-- No record permission -->
-  <div id="panel-no-permission" class="panel" style="display:none">
-    <p style="color:#8B92A5;line-height:1.5">
-      Your role (<span id="no-perm-role"></span>) cannot record walkthroughs.<br/>
-      Contact your organization owner.
-    </p>
-  </div>
-
-  <!-- Recording controls -->
-  <div id="panel-record" style="display:none">
-    <div id="status-bar" class="status-bar">
-      <div id="dot" class="dot"></div>
-      <span id="status-text">Ready to record</span>
-    </div>
-    <button id="btn-start" class="btn btn-primary">Start Recording</button>
-    <button id="btn-stop"  class="btn btn-danger"  style="display:none">Stop Recording</button>
-  </div>
-
-  <!-- Save form (shown after stopping) -->
-  <div id="panel-save" style="display:none">
-    <label for="inp-title">Walkthrough title *</label>
-    <input id="inp-title" type="text" placeholder="e.g. Create a new task in GanttPRO" />
-
-    <label for="inp-desc">Description</label>
-    <textarea id="inp-desc" placeholder="Optional: what does this walkthrough cover?"></textarea>
-
-    <label for="inp-category">Category</label>
-    <select id="inp-category">
-      <option value="">— Select —</option>
-      <option value="onboarding">Onboarding</option>
-      <option value="training">Training</option>
-      <option value="sop">SOP / Compliance</option>
-      <option value="other">Other</option>
-    </select>
-
-    <button id="btn-save" class="btn btn-primary" style="margin-top:16px">Save Walkthrough</button>
-    <button id="btn-discard" class="btn btn-ghost">Discard</button>
-  </div>
-
-  <!-- Result -->
-  <div id="panel-result" style="display:none">
-    <div id="result-icon" class="icon"></div>
-    <p id="result-msg"></p>
-    <a id="btn-dashboard" href="https://hoponai.com/dashboard/walkthroughs" target="_blank" class="btn btn-primary" style="display:none">
-      View in Dashboard
-    </a>
-    <button id="btn-record-another" class="btn btn-ghost" style="display:none">Record Another</button>
-  </div>
-
-  <!-- Footer -->
-  <div class="footer">
-    <a href="https://hoponai.com/dashboard" target="_blank">Open Dashboard</a>
   </div>
 
   <script src="popup.js"></script>
