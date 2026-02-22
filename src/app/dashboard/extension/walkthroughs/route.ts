@@ -1,18 +1,37 @@
 import { auth } from '@clerk/nextjs/server';
 import { createServerClient } from '@/lib/supabase';
-import { NextResponse } from 'next/server';
+import { verifyExtensionToken, extractBearerToken } from '@/lib/extension-token';
+import { NextRequest, NextResponse } from 'next/server';
 
-// Extension sends recorded walkthrough data here
-export async function POST(req: Request) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
+export async function POST(req: NextRequest) {
   const supabase = createServerClient();
+  let dbUserId: string | null = null;
+
+  // ── Auth method 1: Bearer token ──
+  const bearerToken = extractBearerToken(req.headers.get('Authorization'));
+  if (bearerToken) {
+    const verified = verifyExtensionToken(bearerToken);
+    if (!verified) return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
+    dbUserId = verified.userId;
+  } else {
+    // ── Auth method 2: Clerk session cookie ──
+    const { userId } = await auth();
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+    const { data: clerkUser } = await supabase
+      .from('users')
+      .select('id')
+      .eq('clerk_user_id', userId)
+      .single();
+
+    if (!clerkUser) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    dbUserId = clerkUser.id;
+  }
 
   const { data: user } = await supabase
     .from('users')
     .select('id, org_id, role')
-    .eq('clerk_user_id', userId)
+    .eq('id', dbUserId)
     .single();
 
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
@@ -31,9 +50,9 @@ export async function POST(req: Request) {
       description: body.description,
       category: body.category,
       target_url: body.target_url,
-      steps: body.steps,        // JSON array of step data from extension
-      metadata: body.metadata,  // duration, screenshot count, etc.
-      status: 'processing',     // Sarah AI will process this
+      steps: body.steps,
+      metadata: body.metadata,
+      status: 'processing',
     })
     .select()
     .single();
@@ -43,10 +62,5 @@ export async function POST(req: Request) {
   }
 
   // TODO: Trigger Sarah AI processing pipeline here
-  // This is where Arik's service would be called to:
-  // 1. Process the DOM snapshots
-  // 2. Generate training modules
-  // 3. Update status to 'ready'
-
   return NextResponse.json({ walkthrough });
 }

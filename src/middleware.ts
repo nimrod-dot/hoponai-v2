@@ -18,6 +18,10 @@ const isPublicRoute = createRouteMatcher([
   '/sign-up(.*)',
   '/api/webhooks(.*)',
   '/api/sales-inquiry',
+  // Extension endpoints handle their own auth (cookie OR Bearer token)
+  '/dashboard/extension/auth',
+  '/dashboard/extension/walkthroughs',
+  '/api/extension/token',
 ]);
 
 export default clerkMiddleware(async (auth, req) => {
