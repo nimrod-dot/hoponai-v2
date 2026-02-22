@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { ChatCompletionMessageParam, ChatCompletionUserMessageParam } from 'openai/resources';
 import { verifyShareToken } from '@/lib/share-token';
 import { verifyExtensionToken, extractBearerToken } from '@/lib/extension-token';
 import { openai } from '@/lib/openai';
@@ -52,25 +53,25 @@ export async function POST(req: NextRequest) {
 
   // Build chat messages — attach the screenshot to the last user message so
   // Sarah can see exactly what's on screen when she replies.
-  const buildMessages = (msgs: { role: string; content: string }[], img: string | null) => {
-    if (!img || msgs.length === 0) {
-      return msgs.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
-    }
-    const allButLast = msgs.slice(0, -1).map((m) => ({
+  const buildMessages = (
+    msgs: { role: string; content: string }[],
+    img: string | null,
+  ): ChatCompletionMessageParam[] => {
+    const textMsgs: ChatCompletionMessageParam[] = msgs.map((m) => ({
       role: m.role as 'user' | 'assistant',
       content: m.content,
     }));
+    if (!img || msgs.length === 0) return textMsgs;
+
     const last = msgs[msgs.length - 1];
-    return [
-      ...allButLast,
-      {
-        role: last.role as 'user' | 'assistant',
-        content: [
-          { type: 'text' as const, text: last.content },
-          { type: 'image_url' as const, image_url: { url: img, detail: 'low' as const } },
-        ],
-      },
-    ];
+    const visionMsg: ChatCompletionUserMessageParam = {
+      role: 'user',
+      content: [
+        { type: 'text', text: last.content },
+        { type: 'image_url', image_url: { url: img, detail: 'low' } },
+      ],
+    };
+    return [...textMsgs.slice(0, -1), visionMsg];
   };
 
   const openaiMessages = [
