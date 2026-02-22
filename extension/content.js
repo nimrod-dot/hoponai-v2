@@ -467,9 +467,10 @@
     if (chat) setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 30);
   }
 
-  async function callSarahPlay(history) {
+  async function callSarahPlay(history, verifyCompletion = false) {
     const { steps, stepIndex, title } = training;
     const step = steps[stepIndex] || {};
+    const nextStep = steps[stepIndex + 1] || {};
 
     // Route through background service worker to avoid CORS
     const result = await chrome.runtime.sendMessage({
@@ -480,10 +481,17 @@
         stepIndex,
         totalSteps: steps.length,
         stepInstruction: step.instruction || '',
+        nextInstruction: verifyCompletion ? (nextStep.instruction || '') : '',
+        verifyCompletion,
       },
     });
 
-    return result?.reply || null;
+    return {
+      reply: result?.reply || null,
+      // When not verifying, always advance. When verifying, trust Sarah's answer
+      // (default true if result is missing — never block the user permanently).
+      stepVerified: result?.stepVerified ?? !verifyCompletion,
+    };
   }
 
   async function sarahNarrate(isGreeting = false) {
@@ -500,7 +508,7 @@
     scrollChat();
 
     try {
-      const reply = await callSarahPlay(updatedHistory);
+      const { reply } = await callSarahPlay(updatedHistory);
       training.isTyping = false;
       if (!trainingEl) return;
       if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
@@ -526,7 +534,7 @@
     scrollChat();
 
     try {
-      const reply = await callSarahPlay(updatedHistory);
+      const { reply } = await callSarahPlay(updatedHistory);
       training.isTyping = false;
       if (!trainingEl) return;
       if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
@@ -543,23 +551,32 @@
     const { steps, stepIndex } = training;
     const isLast = stepIndex + 1 >= steps.length;
 
-    const userMsg = isLast ? 'I completed the last step!' : `Done! Moving to step ${stepIndex + 2}.`;
+    // Ask Sarah to verify the current step from the screenshot before advancing.
+    // We do NOT increment stepIndex yet — Sarah decides whether we move forward.
+    const userMsg = isLast
+      ? 'I completed the last step!'
+      : 'I think I completed this step — can you check the screen and confirm?';
     const updatedHistory = [...training.chatHistory, { role: 'user', content: userMsg }];
     training.chatHistory = updatedHistory;
-
-    if (!isLast) {
-      training.stepIndex = stepIndex + 1;
-      highlightStep(training.steps[training.stepIndex]);
-    }
     training.isTyping = true;
     renderWidget();
     scrollChat();
 
     try {
-      const reply = await callSarahPlay(updatedHistory);
+      // Pass verifyCompletion=true for non-final steps so Sarah checks the screenshot
+      const { reply, stepVerified } = await callSarahPlay(updatedHistory, !isLast);
       training.isTyping = false;
       if (!trainingEl) return;
-      if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
+
+      if (reply) {
+        training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
+      }
+
+      // Only advance when Sarah confirms the step is done in the screenshot
+      if (!isLast && stepVerified) {
+        training.stepIndex = stepIndex + 1;
+        highlightStep(training.steps[training.stepIndex]);
+      }
     } catch {
       training.isTyping = false;
     }

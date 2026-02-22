@@ -18,7 +18,14 @@ Rules:
 - Keep the entire reply to 2–3 sentences maximum
 - If they ask a question, answer briefly then redirect to the current step
 - Never say "step X" — describe the action naturally
-- Use a warm coaching tone`;
+- Use a warm coaching tone
+
+VERIFICATION MODE (when context says "Verify step completion"):
+- Examine the screenshot carefully to determine if the required action was actually done
+- Common verification signals: text entered in a field, modal/dialog opened, page navigation occurred, checkbox/toggle changed, item selected
+- If clearly done → verified:true, briefly confirm and narrate the next step
+- If NOT clearly done or uncertain → verified:false, kindly but firmly tell them what is still missing
+- Respond ONLY with valid JSON (no markdown fences): {"verified": true/false, "reply": "1-2 sentence message"}`;
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -38,18 +45,28 @@ export async function POST(req: NextRequest) {
     stepIndex = 0,
     totalSteps = 1,
     stepInstruction = '',
+    nextInstruction = '',  // next step's instruction, present only during verification
+    verifyCompletion = false,
   } = context;
 
   const isFinalStep = stepIndex + 1 >= totalSteps;
 
-  const contextMsg = [
-    `Walkthrough title: "${walkthroughTitle}"`,
-    `Current step: ${stepIndex + 1} of ${totalSteps}`,
-    stepInstruction && `What the user needs to do right now: "${stepInstruction}"`,
-    isFinalStep && `This is the FINAL step — congratulate them when they complete it.`,
-  ]
-    .filter(Boolean)
-    .join('\n');
+  let contextMsg: string;
+  if (verifyCompletion) {
+    contextMsg = [
+      `Verify step completion — Walkthrough: "${walkthroughTitle}"`,
+      `Step ${stepIndex + 1} of ${totalSteps}: "${stepInstruction}"`,
+      nextInstruction && `Next step (narrate only if current is verified): "${nextInstruction}"`,
+      `Respond ONLY with valid JSON: {"verified": true/false, "reply": "1-2 sentence message"}`,
+    ].filter(Boolean).join('\n');
+  } else {
+    contextMsg = [
+      `Walkthrough title: "${walkthroughTitle}"`,
+      `Current step: ${stepIndex + 1} of ${totalSteps}`,
+      stepInstruction && `What the user needs to do right now: "${stepInstruction}"`,
+      isFinalStep && `This is the FINAL step — congratulate them when they complete it.`,
+    ].filter(Boolean).join('\n');
+  }
 
   // Build chat messages — attach the screenshot to the last user message so
   // Sarah can see exactly what's on screen when she replies.
@@ -87,9 +104,22 @@ export async function POST(req: NextRequest) {
     temperature: 0.5,
   });
 
-  const reply =
-    completion.choices[0].message.content?.trim() ??
-    "Let's keep going — click 'Got it' when you're ready for the next step!";
+  const rawReply = completion.choices[0].message.content?.trim() ?? '';
 
-  return NextResponse.json({ reply });
+  if (verifyCompletion) {
+    try {
+      // GPT sometimes wraps JSON in markdown fences — strip them
+      const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
+      const parsed = JSON.parse(jsonMatch?.[0] ?? rawReply);
+      const reply = String(parsed.reply || rawReply);
+      const stepVerified = parsed.verified !== false; // default true on ambiguity
+      return NextResponse.json({ reply, stepVerified });
+    } catch {
+      // JSON parse failed — let the user proceed so they're never stuck
+      return NextResponse.json({ reply: rawReply, stepVerified: true });
+    }
+  }
+
+  const reply = rawReply || "Let's keep going — click 'Got it' when you're ready for the next step!";
+  return NextResponse.json({ reply, stepVerified: true });
 }
