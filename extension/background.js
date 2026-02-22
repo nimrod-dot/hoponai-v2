@@ -34,6 +34,15 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     case 'REMOVE_TRAINING':
       handleRemoveTraining(message.tabId).then(sendResponse);
       return true;
+
+    // Content scripts can't call hoponai.com directly (CORS). Route via service worker.
+    case 'FETCH_WALKTHROUGH':
+      bgFetchWalkthrough(message.walkthroughId).then(sendResponse);
+      return true;
+
+    case 'CALL_SARAH_PLAY':
+      bgCallSarahPlay(message.messages, message.context).then(sendResponse);
+      return true;
   }
 });
 
@@ -203,4 +212,45 @@ async function getState() {
     startTime: state.start_time || null,
     tabId: state.tab_id || null,
   };
+}
+
+// ─── CORS Proxy for Content Scripts ──────────────────────────────────────────
+// Content scripts on ganttpro.com can't call hoponai.com directly (CORS).
+// These handlers run in the service worker which has no such restriction.
+
+async function bgFetchWalkthrough(walkthroughId) {
+  const stored = await chrome.storage.local.get('extension_token');
+  const token = stored.extension_token || null;
+  try {
+    const res = await fetch(
+      `${APP_URL}/dashboard/extension/walkthroughs?id=${walkthroughId}`,
+      { headers: token ? { 'Authorization': `Bearer ${token}` } : {} },
+    );
+    if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
+    const data = await res.json();
+    const steps = Array.isArray(data.walkthrough?.steps) ? data.walkthrough.steps : [];
+    return { ok: true, steps, title: data.walkthrough?.title || '' };
+  } catch (e) {
+    return { ok: false, error: String(e) };
+  }
+}
+
+async function bgCallSarahPlay(messages, context) {
+  const stored = await chrome.storage.local.get('extension_token');
+  const token = stored.extension_token || null;
+  try {
+    const res = await fetch(`${APP_URL}/api/sarah/play`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({ messages, context }),
+    });
+    if (!res.ok) return { ok: false };
+    const data = await res.json();
+    return { ok: true, reply: data.reply };
+  } catch {
+    return { ok: false };
+  }
 }

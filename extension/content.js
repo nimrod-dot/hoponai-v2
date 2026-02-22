@@ -6,8 +6,6 @@
   if (window.__hoponai_cs__) return;
   window.__hoponai_cs__ = true;
 
-  const APP_URL = 'https://hoponai.com';
-
   // ─── Recording State ────────────────────────────────────────────────────────
 
   let isListening = false;
@@ -192,20 +190,17 @@
     trainingEl = el;
 
     try {
-      const token = await getExtToken();
-      const res = await fetch(`${APP_URL}/dashboard/extension/walkthroughs?id=${walkthroughId}`, {
-        credentials: 'include',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
-      });
+      // Route through background service worker to avoid CORS (content scripts
+      // run in the page origin and cannot directly call hoponai.com)
+      const result = await chrome.runtime.sendMessage({ type: 'FETCH_WALKTHROUGH', walkthroughId });
 
-      if (!res.ok) {
-        showWidgetError('Failed to load walkthrough. Please try again.');
+      if (!result?.ok) {
+        showWidgetError(result?.error || 'Failed to load walkthrough. Please try again.');
         return;
       }
 
-      const data = await res.json();
-      const steps = Array.isArray(data.walkthrough?.steps) ? data.walkthrough.steps : [];
-      const actualTitle = data.walkthrough?.title || title;
+      const steps = result.steps || [];
+      const actualTitle = result.title || title;
 
       if (steps.length === 0) {
         showWidgetError('No steps found. Process the walkthrough with AI first.');
@@ -395,36 +390,23 @@
     if (chat) setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 30);
   }
 
-  async function getExtToken() {
-    const s = await chrome.storage.local.get('extension_token');
-    return s.extension_token || null;
-  }
-
   async function callSarahPlay(history) {
     const { steps, stepIndex, title } = training;
     const step = steps[stepIndex] || {};
-    const token = await getExtToken();
 
-    const res = await fetch(`${APP_URL}/api/sarah/play`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+    // Route through background service worker to avoid CORS
+    const result = await chrome.runtime.sendMessage({
+      type: 'CALL_SARAH_PLAY',
+      messages: history,
+      context: {
+        walkthroughTitle: title,
+        stepIndex,
+        totalSteps: steps.length,
+        stepInstruction: step.instruction || '',
       },
-      body: JSON.stringify({
-        messages: history,
-        context: {
-          walkthroughTitle: title,
-          stepIndex,
-          totalSteps: steps.length,
-          stepInstruction: step.instruction || '',
-        },
-      }),
     });
 
-    if (!res.ok) return null;
-    const data = await res.json();
-    return data.reply || null;
+    return result?.reply || null;
   }
 
   async function sarahNarrate(isGreeting = false) {
