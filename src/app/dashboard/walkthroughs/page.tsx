@@ -32,7 +32,6 @@ export default async function WalkthroughsPage() {
         </div>
       </div>
 
-      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       {!hasWalkthroughs ? (
         <div style={{
           background: '#fff', borderRadius: 16, border: '1px solid #E8ECF2',
@@ -54,37 +53,32 @@ export default async function WalkthroughsPage() {
           </a>
         </div>
       ) : (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
-          {walkthroughs.map((w: any) => {
-            const stepCount = Array.isArray(w.steps) ? w.steps.length : (w.steps_count || 0);
-            return (
-              <a key={w.id} href={`/dashboard/walkthroughs/${w.id}`} style={{
-                display: 'block', textDecoration: 'none',
-                background: '#fff', borderRadius: 12, border: '1px solid #E8ECF2',
-                padding: 24, transition: 'box-shadow 0.15s, border-color 0.15s',
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = '#0EA5E9';
-                (e.currentTarget as HTMLElement).style.boxShadow = '0 4px 16px rgba(14,165,233,0.1)';
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLElement).style.borderColor = '#E8ECF2';
-                (e.currentTarget as HTMLElement).style.boxShadow = 'none';
-              }}>
-                <div style={{ fontSize: 16, fontWeight: 600, color: '#1A1D26', marginBottom: 6 }}>
-                  {w.title || 'Untitled Walkthrough'}
-                </div>
-                <div style={{ fontSize: 13, color: '#8B92A5', marginBottom: w.description ? 8 : 0 }}>
-                  {stepCount} step{stepCount !== 1 ? 's' : ''} · {new Date(w.created_at).toLocaleDateString()}
-                  {w.category && <span style={{ marginLeft: 8, background: '#F0F9FF', color: '#0EA5E9', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>{w.category}</span>}
-                </div>
-                {w.description && (
-                  <div style={{ fontSize: 13, color: '#4A5168', lineHeight: 1.5 }}>{w.description}</div>
-                )}
-              </a>
-            );
-          })}
-        </div>
+        <>
+          <style>{`.wt-card:hover { border-color: #0EA5E9 !important; box-shadow: 0 4px 16px rgba(14,165,233,0.1); }`}</style>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+            {(walkthroughs as any[]).map((w) => {
+              const stepCount = Array.isArray(w.steps) ? w.steps.length : (w.steps_count || 0);
+              return (
+                <a key={w.id} href={`/dashboard/walkthroughs/${w.id}`} className="wt-card" style={{
+                  display: 'block', textDecoration: 'none',
+                  background: '#fff', borderRadius: 12, border: '1px solid #E8ECF2',
+                  padding: 24, transition: 'box-shadow 0.15s, border-color 0.15s',
+                }}>
+                  <div style={{ fontSize: 16, fontWeight: 600, color: '#1A1D26', marginBottom: 6 }}>
+                    {w.title || 'Untitled Walkthrough'}
+                  </div>
+                  <div style={{ fontSize: 13, color: '#8B92A5', marginBottom: w.description ? 8 : 0 }}>
+                    {stepCount} step{stepCount !== 1 ? 's' : ''} · {new Date(w.created_at).toLocaleDateString()}
+                    {w.category && <span style={{ marginLeft: 8, background: '#F0F9FF', color: '#0EA5E9', padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 600 }}>{w.category}</span>}
+                  </div>
+                  {w.description && (
+                    <div style={{ fontSize: 13, color: '#4A5168', lineHeight: 1.5 }}>{w.description}</div>
+                  )}
+                </a>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
