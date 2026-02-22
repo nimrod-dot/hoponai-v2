@@ -18,10 +18,5 @@ export default async function DashboardLayout({
     .eq('clerk_user_id', userId)
     .single();
 
-  // If not onboarded, redirect to questionnaire
-  if (user && !user.onboarded) {
-    redirect('/onboard');
-  }
-
   return <DashboardShell user={user}>{children}</DashboardShell>;
 }
