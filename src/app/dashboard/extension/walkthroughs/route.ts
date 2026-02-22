@@ -3,38 +3,77 @@ import { createServerClient } from '@/lib/supabase';
 import { verifyExtensionToken, extractBearerToken } from '@/lib/extension-token';
 import { NextRequest, NextResponse } from 'next/server';
 
-export async function POST(req: NextRequest) {
+// ── Helper: resolve DB user from Bearer token or Clerk cookie ──────────────────
+async function resolveUser(req: NextRequest) {
   const supabase = createServerClient();
-  let dbUserId: string | null = null;
-
-  // ── Auth method 1: Bearer token ──
   const bearerToken = extractBearerToken(req.headers.get('Authorization'));
+
   if (bearerToken) {
     const verified = verifyExtensionToken(bearerToken);
-    if (!verified) return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
-    dbUserId = verified.userId;
-  } else {
-    // ── Auth method 2: Clerk session cookie ──
-    const { userId } = await auth();
-    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
-    const { data: clerkUser } = await supabase
+    if (!verified) return null;
+    const { data: user } = await supabase
       .from('users')
-      .select('id')
-      .eq('clerk_user_id', userId)
+      .select('id, org_id, role')
+      .eq('id', verified.userId)
       .single();
-
-    if (!clerkUser) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    dbUserId = clerkUser.id;
+    return user ?? null;
   }
 
-  const { data: user } = await supabase
+  const { userId } = await auth();
+  if (!userId) return null;
+  const { data: clerkUser } = await supabase
     .from('users')
     .select('id, org_id, role')
-    .eq('id', dbUserId)
+    .eq('clerk_user_id', userId)
     .single();
+  return clerkUser ?? null;
+}
 
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+// ── GET: list ready walkthroughs, or full detail with ?id= ────────────────────
+export async function GET(req: NextRequest) {
+  const supabase = createServerClient();
+  const user = await resolveUser(req);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const walkthroughId = req.nextUrl.searchParams.get('id');
+
+  if (walkthroughId) {
+    // Full walkthrough including steps (for training widget)
+    const { data: w } = await supabase
+      .from('walkthroughs')
+      .select('id, title, description, steps, status')
+      .eq('id', walkthroughId)
+      .eq('org_id', user.org_id)
+      .eq('status', 'ready')
+      .single();
+    if (!w) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json({ walkthrough: w });
+  }
+
+  // List only (no step bodies)
+  const { data: walkthroughs } = await supabase
+    .from('walkthroughs')
+    .select('id, title, description, status, created_at, metadata')
+    .eq('org_id', user.org_id)
+    .eq('status', 'ready')
+    .order('created_at', { ascending: false });
+
+  const list = (walkthroughs ?? []).map((w) => ({
+    id: w.id,
+    title: w.title,
+    description: w.description,
+    stepCount: w.metadata?.step_count ?? 0,
+  }));
+
+  return NextResponse.json({ walkthroughs: list });
+}
+
+// ── POST: upload a new walkthrough (from extension recording) ─────────────────
+export async function POST(req: NextRequest) {
+  const supabase = createServerClient();
+  const user = await resolveUser(req);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   if (!['owner', 'admin', 'trainer'].includes(user.role)) {
     return NextResponse.json({ error: 'Not authorized to record' }, { status: 403 });
   }
@@ -61,6 +100,5 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to save walkthrough' }, { status: 500 });
   }
 
-  // TODO: Trigger Sarah AI processing pipeline here
   return NextResponse.json({ walkthrough });
 }

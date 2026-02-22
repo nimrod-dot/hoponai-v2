@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyShareToken } from '@/lib/share-token';
+import { verifyExtensionToken, extractBearerToken } from '@/lib/extension-token';
 import { openai } from '@/lib/openai';
 
 const SARAH_PLAY_SYSTEM = `You are Sarah, a warm and concise AI training guide for Hoponai.
@@ -18,9 +19,13 @@ export async function POST(req: NextRequest) {
   const body = await req.json();
   const { shareToken, messages = [], context = {} } = body;
 
-  const verified = verifyShareToken(shareToken);
-  if (!verified) {
-    return NextResponse.json({ error: 'Invalid share token' }, { status: 401 });
+  // Auth: accept either a share token (web player) or extension Bearer token (in-page widget)
+  const shareVerified = shareToken ? verifyShareToken(shareToken) : null;
+  const bearerToken = extractBearerToken(req.headers.get('Authorization'));
+  const bearerVerified = bearerToken ? verifyExtensionToken(bearerToken) : null;
+
+  if (!shareVerified && !bearerVerified) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const {

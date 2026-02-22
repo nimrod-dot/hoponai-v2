@@ -36,6 +36,7 @@ function getActions(ctx: {
   }
   return [
     { label: 'Start Recording', action: 'start_recording' },
+    { label: 'Follow a Walkthrough', action: 'list_walkthroughs' },
     { label: 'How does it work?', action: 'help' },
   ];
 }
