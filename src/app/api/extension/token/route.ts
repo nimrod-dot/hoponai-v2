@@ -1,22 +1,54 @@
-import { auth } from '@clerk/nextjs/server';
+import { auth, clerkClient } from '@clerk/nextjs/server';
 import { createServerClient } from '@/lib/supabase';
 import { generateExtensionToken } from '@/lib/extension-token';
 import { NextResponse } from 'next/server';
 
-// Clerk-protected: user must be logged into the web app to call this.
-// Returns a 30-day HMAC-signed token the extension can use as a Bearer token.
 export async function POST() {
   const { userId } = await auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const supabase = createServerClient();
-  const { data: user } = await supabase
+  let { data: user } = await supabase
     .from('users')
     .select('id, org_id, role')
     .eq('clerk_user_id', userId)
     .single();
 
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+  // ── Auto-provision if webhook never created the record ──────────────────────
+  if (!user) {
+    const clerk = await clerkClient();
+    const clerkUser = await clerk.users.getUser(userId);
+    const email = clerkUser.emailAddresses[0]?.emailAddress || '';
+    const fullName = [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(' ');
+
+    // Create org first
+    const { data: org } = await supabase
+      .from('organizations')
+      .insert({
+        name: fullName ? `${fullName}'s Organization` : 'My Organization',
+        slug: `org-${userId.slice(-8)}`,
+      })
+      .select()
+      .single();
+
+    // Create user record
+    const { data: newUser } = await supabase
+      .from('users')
+      .insert({
+        clerk_user_id: userId,
+        org_id: org?.id,
+        email,
+        full_name: fullName || null,
+        avatar_url: clerkUser.imageUrl || null,
+        role: 'owner',
+      })
+      .select('id, org_id, role')
+      .single();
+
+    user = newUser;
+  }
+
+  if (!user) return NextResponse.json({ error: 'Failed to create user record' }, { status: 500 });
 
   if (!['owner', 'admin', 'trainer'].includes(user.role)) {
     return NextResponse.json({ error: 'Role cannot record' }, { status: 403 });
