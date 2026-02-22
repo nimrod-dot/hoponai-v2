@@ -239,19 +239,22 @@ async function bgCallSarahPlay(messages, context, tabId) {
   const stored = await chrome.storage.local.get('extension_token');
   const token = stored.extension_token || null;
 
-  // Capture a screenshot of what the user currently sees so Sarah can give
-  // contextual guidance based on the actual screen state.
+  // Capture a screenshot so Sarah can see the current screen state.
+  // Skip on the initial greeting (context.skipScreenshot=true) to prevent Sarah
+  // from misinterpreting incidental on-screen state as an already-completed step.
   let screenshot = null;
-  try {
-    if (tabId) {
-      const tab = await chrome.tabs.get(tabId);
-      screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, {
-        format: 'jpeg',
-        quality: 40, // low quality is fine — Sarah just needs to see the UI
-      });
+  if (!context.skipScreenshot) {
+    try {
+      if (tabId) {
+        const tab = await chrome.tabs.get(tabId);
+        screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, {
+          format: 'jpeg',
+          quality: 40,
+        });
+      }
+    } catch {
+      // Capture may fail if tab is not visible — proceed without screenshot
     }
-  } catch {
-    // Capture may fail if tab is not visible — proceed without screenshot
   }
 
   try {
@@ -265,7 +268,8 @@ async function bgCallSarahPlay(messages, context, tabId) {
     });
     if (!res.ok) return { ok: false };
     const data = await res.json();
-    return { ok: true, reply: data.reply };
+    // Forward stepVerified so content.js can gate whether to advance the step
+    return { ok: true, reply: data.reply, stepVerified: data.stepVerified };
   } catch {
     return { ok: false };
   }

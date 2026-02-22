@@ -21,10 +21,11 @@ Rules:
 - Use a warm coaching tone
 
 VERIFICATION MODE (when context says "Verify step completion"):
-- Examine the screenshot carefully to determine if the required action was actually done
-- Common verification signals: text entered in a field, modal/dialog opened, page navigation occurred, checkbox/toggle changed, item selected
-- If clearly done → verified:true, briefly confirm and narrate the next step
-- If NOT clearly done or uncertain → verified:false, kindly but firmly tell them what is still missing
+- The "User's last click" in context is your PRIMARY evidence for click-based actions
+- Screenshots cannot capture transient states: button presses, dropdown interactions, or recently-completed navigation — do not penalize the user for these
+- If the last click text/label matches the required action → verified:true, acknowledge what you saw ("I can see you clicked [X]!")
+- Use screenshot as secondary evidence mainly for text-entry steps (can you see typed text in a field?)
+- When not verified: say specifically what is still missing, don't repeat the full instruction
 - Respond ONLY with valid JSON (no markdown fences): {"verified": true/false, "reply": "1-2 sentence message"}`;
 
 export async function POST(req: NextRequest) {
@@ -47,16 +48,25 @@ export async function POST(req: NextRequest) {
     stepInstruction = '',
     nextInstruction = '',  // next step's instruction, present only during verification
     verifyCompletion = false,
+    isGreeting = false,
+    lastClickedElement = null,
   } = context;
 
   const isFinalStep = stepIndex + 1 >= totalSteps;
 
   let contextMsg: string;
   if (verifyCompletion) {
+    const clickLine = lastClickedElement
+      ? `User's last click (${Math.round((lastClickedElement.msSinceClick ?? 0) / 1000)}s ago): ` +
+        `"${lastClickedElement.text || lastClickedElement.ariaLabel}" (${lastClickedElement.tag})` +
+        `\n→ Treat this as PRIMARY evidence. Screenshots miss transient states (dropdown opens, button presses, navigation).`
+      : `No recent click detected — rely on screenshot carefully.`;
+
     contextMsg = [
       `Verify step completion — Walkthrough: "${walkthroughTitle}"`,
       `Step ${stepIndex + 1} of ${totalSteps}: "${stepInstruction}"`,
-      nextInstruction && `Next step (narrate only if current is verified): "${nextInstruction}"`,
+      clickLine,
+      nextInstruction && `Next step (narrate only if verified): "${nextInstruction}"`,
       `Respond ONLY with valid JSON: {"verified": true/false, "reply": "1-2 sentence message"}`,
     ].filter(Boolean).join('\n');
   } else {
@@ -65,6 +75,7 @@ export async function POST(req: NextRequest) {
       `Current step: ${stepIndex + 1} of ${totalSteps}`,
       stepInstruction && `What the user needs to do right now: "${stepInstruction}"`,
       isFinalStep && `This is the FINAL step — congratulate them when they complete it.`,
+      isGreeting && `This is the START of the walkthrough. Do NOT assume any steps are already done based on the screenshot. Greet warmly and narrate step 1 fresh.`,
     ].filter(Boolean).join('\n');
   }
 

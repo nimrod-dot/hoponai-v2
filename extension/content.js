@@ -167,6 +167,8 @@
   /** @type {HTMLElement|null} */
   let highlightEl = null;
   let lastHighlightedStepIndex = -1;
+  let lastTrainingClick = null;
+  let onPageClickHandler = null;
 
   let training = {
     steps: /** @type {any[]} */ ([]),
@@ -220,6 +222,26 @@
         minimized: false,
       };
 
+      // Track page clicks so Sarah can use them as primary verification evidence
+      lastTrainingClick = null;
+      if (onPageClickHandler) {
+        document.removeEventListener('click', onPageClickHandler, { capture: true });
+      }
+      onPageClickHandler = (e) => {
+        if (!trainingEl) return;
+        const el = e.target;
+        if (el.closest?.('#__hoponai_training__') || el.closest?.('#__hoponai_hl__')) return;
+        lastTrainingClick = {
+          text: (el.textContent || '').trim().slice(0, 80),
+          ariaLabel: el.getAttribute?.('aria-label') || '',
+          placeholder: el.getAttribute?.('placeholder') || '',
+          tag: (el.tagName || 'unknown').toLowerCase(),
+          id: el.id || '',
+          timestamp: Date.now(),
+        };
+      };
+      document.addEventListener('click', onPageClickHandler, { capture: true, passive: true });
+
       renderWidget();
       makeDraggable();
       highlightStep(steps[0]);
@@ -265,6 +287,11 @@
   function removeTrainingWidget() {
     removeHighlight();
     lastHighlightedStepIndex = -1;
+    if (onPageClickHandler) {
+      document.removeEventListener('click', onPageClickHandler, { capture: true });
+      onPageClickHandler = null;
+    }
+    lastTrainingClick = null;
     if (trainingEl) {
       trainingEl.remove();
       trainingEl = null;
@@ -467,10 +494,15 @@
     if (chat) setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 30);
   }
 
-  async function callSarahPlay(history, verifyCompletion = false) {
+  async function callSarahPlay(history, verifyCompletion = false, isGreeting = false) {
     const { steps, stepIndex, title } = training;
     const step = steps[stepIndex] || {};
     const nextStep = steps[stepIndex + 1] || {};
+
+    const msSinceClick = lastTrainingClick ? Date.now() - lastTrainingClick.timestamp : null;
+    const recentClick = (lastTrainingClick && msSinceClick < 30000)
+      ? { ...lastTrainingClick, msSinceClick }
+      : null;
 
     // Route through background service worker to avoid CORS
     const result = await chrome.runtime.sendMessage({
@@ -483,6 +515,9 @@
         stepInstruction: step.instruction || '',
         nextInstruction: verifyCompletion ? (nextStep.instruction || '') : '',
         verifyCompletion,
+        isGreeting,
+        skipScreenshot: isGreeting,
+        lastClickedElement: recentClick,
       },
     });
 
@@ -508,7 +543,7 @@
     scrollChat();
 
     try {
-      const { reply } = await callSarahPlay(updatedHistory);
+      const { reply } = await callSarahPlay(updatedHistory, false, isGreeting);
       training.isTyping = false;
       if (!trainingEl) return;
       if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
@@ -575,6 +610,7 @@
       // Only advance when Sarah confirms the step is done in the screenshot
       if (!isLast && stepVerified) {
         training.stepIndex = stepIndex + 1;
+        lastTrainingClick = null;  // clear so old click doesn't affect the next step
         highlightStep(training.steps[training.stepIndex]);
       }
     } catch {
