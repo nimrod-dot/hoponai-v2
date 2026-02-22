@@ -164,6 +164,10 @@
   /** @type {HTMLElement|null} */
   let trainingEl = null;
 
+  /** @type {HTMLElement|null} */
+  let highlightEl = null;
+  let lastHighlightedStepIndex = -1;
+
   let training = {
     steps: /** @type {any[]} */ ([]),
     title: '',
@@ -218,6 +222,7 @@
 
       renderWidget();
       makeDraggable();
+      highlightStep(steps[0]);
       sarahNarrate(true);
 
     } catch (err) {
@@ -242,7 +247,7 @@
       'position:fixed',
       'right:16px',
       'top:72px',
-      'width:300px',
+      'width:360px',
       'background:#fff',
       'border-radius:16px',
       'box-shadow:0 8px 48px rgba(0,0,0,0.22)',
@@ -258,10 +263,76 @@
   }
 
   function removeTrainingWidget() {
+    removeHighlight();
+    lastHighlightedStepIndex = -1;
     if (trainingEl) {
       trainingEl.remove();
       trainingEl = null;
     }
+  }
+
+  function removeHighlight() {
+    if (highlightEl) { highlightEl.remove(); highlightEl = null; }
+  }
+
+  function highlightStep(step) {
+    removeHighlight();
+    if (!step?.element) return;
+
+    let el = null;
+
+    // Try by id first (fastest lookup)
+    if (step.element.id) {
+      el = document.getElementById(step.element.id);
+    }
+
+    // Fall back to xpath
+    if (!el && step.element.xpath) {
+      try {
+        const xr = document.evaluate(
+          step.element.xpath, document, null,
+          XPathResult.FIRST_ORDERED_NODE_TYPE, null,
+        );
+        el = /** @type {HTMLElement|null} */ (xr.singleNodeValue);
+      } catch {}
+    }
+
+    // Skip if not found, is body, or is inside the training widget itself
+    if (!el || el === document.body || el.closest?.('#__hoponai_training__')) return;
+
+    el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
+
+    // Wait for scroll to settle before positioning the fixed overlay
+    setTimeout(() => {
+      if (!el) return;
+      const rect = el.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) return;
+
+      if (!document.getElementById('__hp_hl_style__')) {
+        const s = document.createElement('style');
+        s.id = '__hp_hl_style__';
+        s.textContent = '@keyframes __hp_ring__{0%,100%{box-shadow:0 0 0 3px rgba(14,165,233,0.35)}50%{box-shadow:0 0 0 9px rgba(14,165,233,0.08)}}';
+        document.head.appendChild(s);
+      }
+
+      const hl = document.createElement('div');
+      hl.id = '__hoponai_hl__';
+      hl.style.cssText = [
+        'position:fixed',
+        `top:${rect.top - 4}px`,
+        `left:${rect.left - 4}px`,
+        `width:${rect.width + 8}px`,
+        `height:${rect.height + 8}px`,
+        'border:2px solid #0EA5E9',
+        'border-radius:6px',
+        'pointer-events:none',
+        'z-index:2147483646',
+        'animation:__hp_ring__ 1.8s ease-in-out infinite',
+      ].join(';');
+
+      document.body.appendChild(hl);
+      highlightEl = hl;
+    }, 350);
   }
 
   function esc(str) {
@@ -354,6 +425,11 @@
     trainingEl.querySelector('#__hp_min__').addEventListener('click', (e) => {
       e.stopPropagation();
       training.minimized = !training.minimized;
+      if (training.minimized) {
+        removeHighlight();
+      } else {
+        highlightStep(training.steps[training.stepIndex]);
+      }
       renderWidget();
       if (!training.minimized) scrollChat();
     });
@@ -367,6 +443,7 @@
       trainingEl.querySelector('#__hp_prev__').addEventListener('click', () => {
         if (training.stepIndex > 0 && !training.isTyping) {
           training.stepIndex--;
+          highlightStep(training.steps[training.stepIndex]);
           renderWidget();
           scrollChat();
         }
@@ -470,7 +547,10 @@
     const updatedHistory = [...training.chatHistory, { role: 'user', content: userMsg }];
     training.chatHistory = updatedHistory;
 
-    if (!isLast) training.stepIndex = stepIndex + 1;
+    if (!isLast) {
+      training.stepIndex = stepIndex + 1;
+      highlightStep(training.steps[training.stepIndex]);
+    }
     training.isTyping = true;
     renderWidget();
     scrollChat();

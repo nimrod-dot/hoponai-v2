@@ -341,7 +341,7 @@ async function startTraining(walkthroughId) {
 
   if (result?.ok) {
     appendSarahBubble(
-      `Training started! A guide is loading on the page. Close this popup and follow along — I'm right there with you!`,
+      `"${title}" is opening on the page now! Click outside this window to close it and follow along — Sarah will guide you there.`,
       [{ label: 'View Dashboard', action: 'go_to_dashboard' }],
     );
   } else {
