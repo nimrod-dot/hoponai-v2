@@ -5,7 +5,7 @@ const APP_URL = 'https://hoponai.com';
 
 // ─── Message Router ───────────────────────────────────────────────────────────
 
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   switch (message.type) {
     case 'START_RECORDING':
       handleStartRecording(message.tabId).then(sendResponse);
@@ -41,7 +41,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return true;
 
     case 'CALL_SARAH_PLAY':
-      bgCallSarahPlay(message.messages, message.context).then(sendResponse);
+      bgCallSarahPlay(message.messages, message.context, sender.tab?.id).then(sendResponse);
       return true;
   }
 });
@@ -235,9 +235,25 @@ async function bgFetchWalkthrough(walkthroughId) {
   }
 }
 
-async function bgCallSarahPlay(messages, context) {
+async function bgCallSarahPlay(messages, context, tabId) {
   const stored = await chrome.storage.local.get('extension_token');
   const token = stored.extension_token || null;
+
+  // Capture a screenshot of what the user currently sees so Sarah can give
+  // contextual guidance based on the actual screen state.
+  let screenshot = null;
+  try {
+    if (tabId) {
+      const tab = await chrome.tabs.get(tabId);
+      screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, {
+        format: 'jpeg',
+        quality: 40, // low quality is fine — Sarah just needs to see the UI
+      });
+    }
+  } catch {
+    // Capture may fail if tab is not visible — proceed without screenshot
+  }
+
   try {
     const res = await fetch(`${APP_URL}/api/sarah/play`, {
       method: 'POST',
@@ -245,7 +261,7 @@ async function bgCallSarahPlay(messages, context) {
         'Content-Type': 'application/json',
         ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
       },
-      body: JSON.stringify({ messages, context }),
+      body: JSON.stringify({ messages, context, screenshot }),
     });
     if (!res.ok) return { ok: false };
     const data = await res.json();
