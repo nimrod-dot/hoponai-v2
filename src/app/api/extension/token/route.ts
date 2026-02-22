@@ -41,11 +41,21 @@ export async function POST() {
         full_name: fullName || null,
         avatar_url: clerkUser.imageUrl || null,
         role: 'owner',
+        onboarded: true,
       })
       .select('id, org_id, role')
       .single();
 
     user = newUser;
+  }
+
+  // ── Ensure existing auto-provisioned users are marked onboarded ─────────────
+  if (user) {
+    await supabase
+      .from('users')
+      .update({ onboarded: true })
+      .eq('id', user.id)
+      .is('onboarded', null);
   }
 
   if (!user) return NextResponse.json({ error: 'Failed to create user record' }, { status: 500 });

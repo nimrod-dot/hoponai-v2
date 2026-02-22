@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hoponai Recorder</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      color: #1A1D26;
+      background: #FAFBFD;
+    }
+
+    /* ── Header ── */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 16px;
+      background: #fff;
+      border-bottom: 1px solid #E8ECF2;
+    }
+    .logo {
+      font-family: Georgia, serif;
+      font-size: 18px;
+      color: #1A1D26;
+    }
+    .logo span { color: #0EA5E9; }
+
+    /* ── Panels ── */
+    .panel { padding: 16px; }
+
+    /* ── Auth ── */
+    #panel-loading { text-align: center; padding: 32px 16px; color: #8B92A5; }
+    #panel-login { text-align: center; padding: 24px 16px; }
+    #panel-login p { color: #8B92A5; margin-bottom: 12px; line-height: 1.5; }
+
+    /* ── User info ── */
+    .user-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      background: rgba(14,165,233,0.05);
+      border-bottom: 1px solid #E8ECF2;
+    }
+    .user-name { font-weight: 600; font-size: 13px; }
+    .user-org { font-size: 12px; color: #8B92A5; }
+    .badge-role {
+      font-size: 11px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 10px;
+      background: #E0F2FE;
+      color: #0EA5E9;
+    }
+
+    /* ── Not-on-GanttPRO warning ── */
+    #panel-wrong-site {
+      padding: 24px 16px;
+      text-align: center;
+    }
+    #panel-wrong-site p { color: #8B92A5; line-height: 1.5; }
+
+    /* ── Recording controls ── */
+    #panel-record { padding: 16px; }
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: #fff;
+      border: 1px solid #E8ECF2;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+      color: #8B92A5;
+    }
+    .status-bar.recording { border-color: #EF4444; background: #FEF2F2; color: #991B1B; }
+    .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: #D1D5DB;
+      flex-shrink: 0;
+    }
+    .dot.pulse {
+      background: #EF4444;
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    /* ── Save form ── */
+    #panel-save { padding: 16px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #4A5168; margin-bottom: 4px; margin-top: 12px; }
+    label:first-child { margin-top: 0; }
+    input[type="text"], textarea, select {
+      width: 100%;
+      padding: 8px 10px;
+      border: 1px solid #E8ECF2;
+      border-radius: 6px;
+      font-size: 13px;
+      color: #1A1D26;
+      background: #fff;
+      outline: none;
+    }
+    input[type="text"]:focus, textarea:focus, select:focus {
+      border-color: #0EA5E9;
+    }
+    textarea { resize: vertical; min-height: 60px; font-family: inherit; }
+
+    /* ── Buttons ── */
+    .btn {
+      display: block;
+      width: 100%;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: opacity 0.15s;
+      text-align: center;
+      text-decoration: none;
+    }
+    .btn:hover { opacity: 0.85; }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #0EA5E9; color: #fff; }
+    .btn-danger  { background: #EF4444; color: #fff; }
+    .btn-ghost   { background: #E8ECF2; color: #1A1D26; }
+    .btn + .btn  { margin-top: 8px; }
+
+    /* ── Result ── */
+    #panel-result { padding: 24px 16px; text-align: center; }
+    #panel-result .icon { font-size: 32px; margin-bottom: 8px; }
+    #panel-result p { color: #8B92A5; margin-bottom: 16px; line-height: 1.5; }
+
+    /* ── Footer ── */
+    .footer {
+      padding: 10px 16px;
+      border-top: 1px solid #E8ECF2;
+      font-size: 11px;
+      color: #8B92A5;
+      text-align: center;
+    }
+    .footer a { color: #0EA5E9; text-decoration: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <div class="header">
+    <img src="icons/icon48.png" width="20" height="20" alt="" />
+    <div class="logo">hopon<span>ai</span></div>
+  </div>
+
+  <!-- Loading -->
+  <div id="panel-loading" class="panel">Checking authentication…</div>
+
+  <!-- Not logged in -->
+  <div id="panel-login" class="panel" style="display:none">
+    <p style="color:#8B92A5;line-height:1.6;margin-bottom:12px">
+      Paste your connection token from the Hoponai dashboard.
+    </p>
+    <input
+      id="inp-token"
+      type="text"
+      placeholder="Paste connection token…"
+      style="width:100%;padding:9px 10px;border:1px solid #E8ECF2;border-radius:8px;font-size:13px;color:#1A1D26;background:#fff;outline:none;margin-bottom:8px;display:block;"
+    />
+    <button id="btn-connect" class="btn btn-primary">Connect</button>
+    <p id="token-error" style="color:#EF4444;font-size:12px;margin-top:6px;display:none"></p>
+
+    <div style="margin:14px 0;display:flex;align-items:center;gap:8px">
+      <div style="flex:1;height:1px;background:#E8ECF2"></div>
+      <span style="font-size:12px;color:#8B92A5">or</span>
+      <div style="flex:1;height:1px;background:#E8ECF2"></div>
+    </div>
+    <a id="btn-login" href="https://hoponai.com/dashboard/extension" class="btn btn-ghost" target="_blank">
+      Get token from dashboard ↗
+    </a>
+    <button id="btn-retry" class="btn btn-ghost" style="margin-top:6px">Retry</button>
+  </div>
+
+  <!-- Logged in: user info row -->
+  <div id="user-row" class="user-row" style="display:none">
+    <div>
+      <div class="user-name" id="user-name"></div>
+      <div class="user-org" id="user-org"></div>
+    </div>
+    <div class="badge-role" id="user-role"></div>
+  </div>
+
+  <!-- Wrong site -->
+  <div id="panel-wrong-site" style="display:none">
+    <p>Navigate to <strong>app.ganttpro.com</strong> to start recording.</p>
+  </div>
+
+  <!-- No record permission -->
+  <div id="panel-no-permission" class="panel" style="display:none">
+    <p style="color:#8B92A5;line-height:1.5">
+      Your role (<span id="no-perm-role"></span>) cannot record walkthroughs.<br/>
+      Contact your organization owner.
+    </p>
+  </div>
+
+  <!-- Recording controls -->
+  <div id="panel-record" style="display:none">
+    <div id="status-bar" class="status-bar">
+      <div id="dot" class="dot"></div>
+      <span id="status-text">Ready to record</span>
+    </div>
+    <button id="btn-start" class="btn btn-primary">Start Recording</button>
+    <button id="btn-stop"  class="btn btn-danger"  style="display:none">Stop Recording</button>
+  </div>
+
+  <!-- Save form (shown after stopping) -->
+  <div id="panel-save" style="display:none">
+    <label for="inp-title">Walkthrough title *</label>
+    <input id="inp-title" type="text" placeholder="e.g. Create a new task in GanttPRO" />
+
+    <label for="inp-desc">Description</label>
+    <textarea id="inp-desc" placeholder="Optional: what does this walkthrough cover?"></textarea>
+
+    <label for="inp-category">Category</label>
+    <select id="inp-category">
+      <option value="">— Select —</option>
+      <option value="onboarding">Onboarding</option>
+      <option value="training">Training</option>
+      <option value="sop">SOP / Compliance</option>
+      <option value="other">Other</option>
+    </select>
+
+    <button id="btn-save" class="btn btn-primary" style="margin-top:16px">Save Walkthrough</button>
+    <button id="btn-discard" class="btn btn-ghost">Discard</button>
+  </div>
+
+  <!-- Result -->
+  <div id="panel-result" style="display:none">
+    <div id="result-icon" class="icon"></div>
+    <p id="result-msg"></p>
+    <a id="btn-dashboard" href="https://hoponai.com/dashboard/walkthroughs" target="_blank" class="btn btn-primary" style="display:none">
+      View in Dashboard
+    </a>
+    <button id="btn-record-another" class="btn btn-ghost" style="display:none">Record Another</button>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <a href="https://hoponai.com/dashboard" target="_blank">Open Dashboard</a>
+  </div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
