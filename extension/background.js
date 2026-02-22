@@ -28,7 +28,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       return true;
 
     case 'INJECT_TRAINING':
-      handleInjectTraining(message.tabId, message.steps, message.title).then(sendResponse);
+      handleInjectTraining(message.tabId, message.walkthroughId, message.title).then(sendResponse);
       return true;
 
     case 'REMOVE_TRAINING':
@@ -155,17 +155,29 @@ async function handleUpload(payload, token = null) {
 
 // ─── Training ─────────────────────────────────────────────────────────────────
 
-async function handleInjectTraining(tabId, steps, title) {
+async function handleInjectTraining(tabId, walkthroughId, title) {
   if (!tabId) return { ok: false, reason: 'no_tab' };
   try {
+    // Auto-inject content script if not already loaded on this tab
+    const [{ result: csLoaded }] = await chrome.scripting.executeScript({
+      target: { tabId },
+      func: () => !!window.__hoponai_cs__,
+    });
+
+    if (!csLoaded) {
+      await chrome.scripting.executeScript({ target: { tabId }, files: ['content.js'] });
+      // Give it a moment to initialize
+      await new Promise((r) => setTimeout(r, 150));
+    }
+
     await chrome.tabs.sendMessage(tabId, {
       type: 'INJECT_TRAINING',
-      steps,
+      walkthroughId,
       title,
     });
     return { ok: true };
-  } catch {
-    return { ok: false, reason: 'content_script_unavailable' };
+  } catch (err) {
+    return { ok: false, reason: 'inject_failed', detail: String(err) };
   }
 }
 

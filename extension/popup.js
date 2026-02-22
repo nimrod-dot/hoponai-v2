@@ -27,6 +27,7 @@ let authData       = null;
 let chatHistory    = [];
 let pollInterval   = null;
 let recordingState = { recording: false, stepCount: 0 };
+let walkthroughList = []; // cached after listWalkthroughs()
 
 // ─── Auth ─────────────────────────────────────────────────────────────────────
 async function getStoredToken() {
@@ -304,6 +305,7 @@ async function listWalkthroughs() {
 
     const data = await res.json();
     const list = data.walkthroughs || [];
+    walkthroughList = list; // cache for title lookup
 
     if (list.length === 0) {
       appendSarahBubble('No processed walkthroughs yet. Record one first, then run "Process with AI" from the dashboard!');
@@ -325,47 +327,27 @@ async function listWalkthroughs() {
 }
 
 async function startTraining(walkthroughId) {
-  const token = await getStoredToken();
-  const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+  // Look up title from cached list (no need to re-fetch here — content script fetches steps itself)
+  const cached = walkthroughList.find((w) => w.id === walkthroughId);
+  const title = cached?.title || 'Training';
 
-  appendSarahBubble('Loading walkthrough steps…');
+  appendSarahBubble(`Starting "${title}"…`);
 
-  try {
-    const res = await fetch(
-      `${APP_URL}/dashboard/extension/walkthroughs?id=${walkthroughId}`,
-      { credentials: 'include', headers },
+  const result = await bg('INJECT_TRAINING', {
+    tabId: currentTabId,
+    walkthroughId,
+    title,
+  });
+
+  if (result?.ok) {
+    appendSarahBubble(
+      `Training started! A guide is loading on the page. Close this popup and follow along — I'm right there with you!`,
+      [{ label: 'View Dashboard', action: 'go_to_dashboard' }],
     );
-
-    if (!res.ok) {
-      appendSarahBubble("Couldn't load that walkthrough. Please try again.");
-      return;
-    }
-
-    const data = await res.json();
-    const walkthrough = data.walkthrough;
-    const steps = Array.isArray(walkthrough?.steps) ? walkthrough.steps : [];
-
-    if (steps.length === 0) {
-      appendSarahBubble('This walkthrough has no steps yet. Please process it with AI from the dashboard first.');
-      return;
-    }
-
-    const result = await bg('INJECT_TRAINING', {
-      tabId: currentTabId,
-      steps,
-      title: walkthrough.title || 'Training',
-    });
-
-    if (result?.ok) {
-      appendSarahBubble(
-        `Training started! A guide with all ${steps.length} steps is now showing on the page. You can close this popup and follow along — I'm right there with you!`,
-        [{ label: 'View Dashboard', action: 'go_to_dashboard' }],
-      );
-    } else {
-      appendSarahBubble("Couldn't start the training widget. Make sure you're on a GanttPRO tab and try again.");
-    }
-  } catch {
-    appendSarahBubble("Something went wrong. Please make sure you're on a GanttPRO page and try again.");
+  } else {
+    appendSarahBubble(
+      "Couldn't start training. If you just installed/updated the extension, refresh your GanttPRO tab and try again.",
+    );
   }
 }
 
