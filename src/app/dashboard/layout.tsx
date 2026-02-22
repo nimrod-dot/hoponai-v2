@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { createServerClient } from '@/lib/supabase';
-import DashboardShell from '@/components/dashboard/DashboardShell';
+import DashboardShell from './DashboardShell';
 
 export default async function DashboardLayout({
   children,

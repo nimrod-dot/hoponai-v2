@@ -42,7 +42,7 @@ export default async function DashboardPage() {
       </p>
 
       {/* Stats cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20, marginBottom: 40 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 16, marginBottom: 40 }}>
         {[
           { label: 'Walkthroughs', value: walkthroughCount || 0, color: '#0EA5E9' },
           { label: 'Team Members', value: teamCount || 0, color: '#10B981' },
@@ -62,7 +62,7 @@ export default async function DashboardPage() {
       <h2 style={{ fontSize: 18, fontWeight: 600, color: '#1A1D26', marginBottom: 16 }}>
         Quick Actions
       </h2>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16 }}>
         <ActionCard
           title="Record a Walkthrough"
           desc="Teach the AI how your software works"
