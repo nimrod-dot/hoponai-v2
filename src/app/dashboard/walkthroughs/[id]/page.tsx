@@ -2,6 +2,7 @@ import { auth } from '@clerk/nextjs/server';
 import { createServerClient } from '@/lib/supabase';
 import { notFound } from 'next/navigation';
 import ProcessButton from './ProcessButton';
+import ShareButton from './ShareButton';
 
 export default async function WalkthroughDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -60,8 +61,11 @@ export default async function WalkthroughDetailPage({ params }: { params: Promis
             )}
           </div>
 
-          {/* Process button — shown when not yet processed */}
-          {!isProcessed && <ProcessButton walkthroughId={id} />}
+          {/* Action buttons */}
+          <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            {isProcessed && <ShareButton walkthroughId={id} />}
+            {!isProcessed && <ProcessButton walkthroughId={id} />}
+          </div>
         </div>
       </div>
 
