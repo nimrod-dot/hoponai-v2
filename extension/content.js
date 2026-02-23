@@ -166,6 +166,8 @@
 
   /** @type {HTMLElement|null} */
   let highlightEl = null;
+  /** @type {HTMLElement|null} */
+  let calloutEl = null;
   let lastHighlightedStepIndex = -1;
   let onPageClickHandler = null;
   let observeDebounceTimer = null;
@@ -297,7 +299,13 @@
   }
 
   function removeHighlight() {
+    if (calloutEl) { calloutEl.remove(); calloutEl = null; }
     if (highlightEl) { highlightEl.remove(); highlightEl = null; }
+  }
+
+  // Strip HTML tags from AI-generated instructions (they sometimes include <div> etc.)
+  function stripHtml(str) {
+    return String(str).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
   }
 
   function highlightStep(step) {
@@ -327,36 +335,87 @@
 
     el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
 
-    // Wait for scroll to settle before positioning the fixed overlay
+    // Wait for scroll to settle before positioning the fixed overlays
     setTimeout(() => {
       if (!el) return;
       const rect = el.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) return;
 
+      // Inject keyframes once
       if (!document.getElementById('__hp_hl_style__')) {
         const s = document.createElement('style');
         s.id = '__hp_hl_style__';
-        s.textContent = '@keyframes __hp_ring__{0%,100%{box-shadow:0 0 0 3px rgba(14,165,233,0.35)}50%{box-shadow:0 0 0 9px rgba(14,165,233,0.08)}}';
+        s.textContent = [
+          // Spotlight: pulsing border + dark backdrop via box-shadow spread
+          '@keyframes __hp_ring__{',
+          '0%,100%{box-shadow:0 0 0 4000px rgba(0,0,0,0.38),0 0 0 0 rgba(14,165,233,0.6),0 0 12px 2px rgba(14,165,233,0.4)}',
+          '50%{box-shadow:0 0 0 4000px rgba(0,0,0,0.38),0 0 0 6px rgba(14,165,233,0.15),0 0 20px 4px rgba(14,165,233,0.2)}',
+          '}',
+          // Callout pulse
+          '@keyframes __hp_callout__{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}',
+        ].join('');
         document.head.appendChild(s);
       }
 
+      // ── Spotlight div ───────────────────────────────────────────────────────
+      const pad = 5;
       const hl = document.createElement('div');
       hl.id = '__hoponai_hl__';
       hl.style.cssText = [
         'position:fixed',
-        `top:${rect.top - 4}px`,
-        `left:${rect.left - 4}px`,
-        `width:${rect.width + 8}px`,
-        `height:${rect.height + 8}px`,
-        'border:2px solid #0EA5E9',
-        'border-radius:6px',
+        `top:${rect.top - pad}px`,
+        `left:${rect.left - pad}px`,
+        `width:${rect.width + pad * 2}px`,
+        `height:${rect.height + pad * 2}px`,
+        'border:2.5px solid #0EA5E9',
+        'border-radius:8px',
         'pointer-events:none',
-        'z-index:2147483646',
-        'animation:__hp_ring__ 1.8s ease-in-out infinite',
+        'z-index:2147483645',
+        'animation:__hp_ring__ 2.2s ease-in-out infinite',
       ].join(';');
-
       document.body.appendChild(hl);
       highlightEl = hl;
+
+      // ── Action callout tooltip ──────────────────────────────────────────────
+      const instruction = step.instruction ? stripHtml(step.instruction) : '';
+      if (!instruction) return;
+
+      // Position below element, flip above if near bottom of viewport
+      const spaceBelow = window.innerHeight - rect.bottom;
+      const tooltipTop = spaceBelow > 80
+        ? rect.bottom + pad + 8
+        : rect.top - pad - 8 - 52;  // approx tooltip height
+
+      // Clamp left so tooltip doesn't overflow viewport
+      const tooltipLeft = Math.max(8, Math.min(rect.left, window.innerWidth - 232));
+
+      const ct = document.createElement('div');
+      ct.id = '__hoponai_callout__';
+      ct.style.cssText = [
+        'position:fixed',
+        `top:${tooltipTop}px`,
+        `left:${tooltipLeft}px`,
+        'max-width:220px',
+        'background:#0F172A',
+        'color:#fff',
+        'font-size:12px',
+        'line-height:1.5',
+        'padding:8px 12px 8px 10px',
+        'border-radius:10px',
+        'pointer-events:none',
+        'z-index:2147483647',
+        `font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif`,
+        'box-shadow:0 4px 16px rgba(0,0,0,0.35)',
+        'display:flex',
+        'align-items:flex-start',
+        'gap:7px',
+        'animation:__hp_callout__ 2.5s ease-in-out infinite',
+      ].join(';');
+
+      // Arrow indicator + text
+      ct.innerHTML = `<span style="font-size:14px;flex-shrink:0;margin-top:1px">👆</span><span>${esc(instruction)}</span>`;
+      document.body.appendChild(ct);
+      calloutEl = ct;
     }, 350);
   }
 
@@ -426,7 +485,7 @@
       <div style="padding:12px;background:#F8FAFC;border-bottom:1px solid #E8ECF2;flex-shrink:0">
         <div style="display:flex;align-items:flex-start;gap:8px">
           <div style="width:26px;height:26px;border-radius:50%;background:#0EA5E9;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${stepIndex + 1}</div>
-          <div style="font-size:12px;font-weight:600;color:#1A1D26;line-height:1.5">${esc(step.instruction || 'Follow the step shown')}</div>
+          <div style="font-size:12px;font-weight:600;color:#1A1D26;line-height:1.5">${esc(stripHtml(step.instruction || 'Follow the step shown'))}</div>
         </div>
         ${step.screenshot ? `<div style="margin-top:10px;border-radius:7px;overflow:hidden;border:1px solid #E8ECF2"><img src="${step.screenshot}" alt="Step ${stepIndex + 1}" style="width:100%;display:block"/></div>` : ''}
       </div>
@@ -669,7 +728,14 @@
         highlightStep(training.steps[training.stepIndex]);
       }
       // Always surface a reply — user pressed the button and expects feedback
-      const msg = reply || "I can see you're making progress — keep going!";
+      const step = training.steps[training.stepIndex] || {};
+      const instruction = stripHtml(step.instruction || '');
+      const fallback = detectedStep > training.stepIndex
+        ? `Great job! Moving to the next step.`
+        : instruction
+          ? `I don't see that done yet — ${instruction.charAt(0).toLowerCase() + instruction.slice(1)}`
+          : "I don't see that done yet — check the highlighted element on screen.";
+      const msg = reply || fallback;
       training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
     } catch {
       training.isTyping = false;
