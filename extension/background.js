@@ -247,7 +247,7 @@ async function bgCallSarahPlay(messages, context, tabId) {
         const tab = await chrome.tabs.get(tabId);
         screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, {
           format: 'jpeg',
-          quality: 40,
+          quality: 70,
         });
       }
     } catch {

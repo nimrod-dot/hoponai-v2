@@ -172,6 +172,7 @@
   let onPageClickHandler = null;
   let observeDebounceTimer = null;
   let urlPollInterval = null;
+  let lastAdvancementTime = 0; // cooldown: prevent re-observe right after step advances
 
   let training = {
     steps: /** @type {any[]} */ ([]),
@@ -182,6 +183,8 @@
     minimized: false,
     isObserving: false,
     lastUrl: '',
+    pendingSkipConfirm: false, // true when Sarah says step isn't done → show Try Again / Skip
+    userMoved: false,          // true once user manually drags widget — disables auto-position
   };
 
   // Entry point: fetch walkthrough data, then show widget
@@ -225,18 +228,27 @@
         chatHistory: [],
         isTyping: false,
         minimized: false,
+        isObserving: false,
+        lastUrl: '',
+        pendingSkipConfirm: false,
+        userMoved: false,
       };
 
-      // Listen for page clicks to schedule proactive auto-observation
+      // Listen for page clicks — advance instantly when user clicks the target element
       if (onPageClickHandler) {
         document.removeEventListener('click', onPageClickHandler, { capture: true });
       }
       onPageClickHandler = (e) => {
-        if (!trainingEl || training.isTyping) return;
+        if (!trainingEl || training.isTyping || training.isObserving) return;
         if (training.stepIndex + 1 >= training.steps.length) return;
-        const el = e.target;
-        if (el.closest?.('#__hoponai_training__') || el.closest?.('#__hoponai_hl__')) return;
-        scheduleAutoObserve();
+        const clicked = /** @type {Element} */ (e.target);
+        if (clicked.closest?.('#__hoponai_training__') || clicked.closest?.('#__hoponai_hl__')) return;
+        const step = training.steps[training.stepIndex];
+        if (step?.element && isTargetElement(clicked, step.element)) {
+          // User clicked exactly the right element — advance immediately, no AI needed
+          handleNextSilent();
+        }
+        // No match → do nothing (no chatty AI calls for wrong clicks)
       };
       document.addEventListener('click', onPageClickHandler, { capture: true, passive: true });
 
@@ -268,7 +280,7 @@
       'position:fixed',
       'right:16px',
       'top:72px',
-      'width:360px',
+      'width:440px',
       'background:#fff',
       'border-radius:16px',
       'box-shadow:0 8px 48px rgba(0,0,0,0.22)',
@@ -303,8 +315,8 @@
     if (highlightEl) { highlightEl.remove(); highlightEl = null; }
   }
 
-  // Floating callout shown at top of page when the target element can't be found
-  // (e.g. user is on a different page than where the element was recorded)
+  // Floating callout shown when the target element can't be found on the current page.
+  // Shows the instruction + a hint to check the screenshot in the widget.
   function showFloatingCallout(instruction) {
     ensureHlStyles();
     const ct = document.createElement('div');
@@ -314,7 +326,7 @@
       'top:16px',
       'left:50%',
       'transform:translateX(-50%)',
-      'max-width:320px',
+      'max-width:340px',
       'background:#0F172A',
       'color:#fff',
       'font-size:12px',
@@ -326,12 +338,17 @@
       `font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif`,
       'box-shadow:0 4px 20px rgba(0,0,0,0.4)',
       'display:flex',
-      'align-items:center',
-      'gap:8px',
+      'flex-direction:column',
+      'gap:4px',
       'animation:__hp_callout__ 2.5s ease-in-out infinite',
       'white-space:normal',
     ].join(';');
-    ct.innerHTML = `<span style="font-size:16px;flex-shrink:0">👆</span><span>${esc(instruction)}</span>`;
+    ct.innerHTML = `
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:15px;flex-shrink:0">👆</span>
+        <span style="font-weight:600">${esc(instruction)}</span>
+      </div>
+      <div style="font-size:11px;color:#94A3B8;padding-left:23px">Check the screenshot in the guide panel →</div>`;
     document.body.appendChild(ct);
     calloutEl = ct;
   }
@@ -353,6 +370,83 @@
   // Strip HTML tags from AI-generated instructions (they sometimes include <div> etc.)
   function stripHtml(str) {
     return String(str).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
+  }
+
+  // Returns true if the clicked element matches the recorded step target.
+  // Checks ID, XPath, aria-label, and text content (walking up a few parents).
+  function isTargetElement(clickedEl, stepEl) {
+    if (!stepEl || !clickedEl) return false;
+
+    // ID match (most reliable)
+    if (stepEl.id && clickedEl.id === stepEl.id) return true;
+
+    // XPath match
+    if (stepEl.xpath) {
+      try {
+        const xr = document.evaluate(stepEl.xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
+        const xpathNode = xr.singleNodeValue;
+        if (xpathNode && (xpathNode === clickedEl || xpathNode.contains(clickedEl))) return true;
+      } catch {}
+    }
+
+    // Aria-label match
+    if (stepEl.aria_label) {
+      const target = stepEl.aria_label.trim().toLowerCase();
+      if ((clickedEl.getAttribute?.('aria-label') || '').trim().toLowerCase() === target) return true;
+    }
+
+    // Text content match — walk up to 3 parents (covers child-icon clicks on a button)
+    if (stepEl.text && stepEl.text.trim().length >= 2) {
+      const target = stepEl.text.trim().toLowerCase();
+      let node = clickedEl;
+      for (let i = 0; i < 4 && node; i++) {
+        const nodeText = (node.textContent || '').trim().toLowerCase();
+        // Only match if the node's own text isn't massively larger than target
+        // (avoids matching a big container that happens to contain the target text)
+        if (nodeText === target || (nodeText.startsWith(target) && nodeText.length < target.length + 40)) {
+          return true;
+        }
+        node = node.parentElement;
+      }
+    }
+
+    return false;
+  }
+
+  // Advance to next step instantly — called when user clicks exactly the right element.
+  function handleNextSilent() {
+    if (!trainingEl || training.stepIndex + 1 >= training.steps.length) return;
+    cancelAutoObserve();
+    doAdvance();
+  }
+
+  // Reposition the widget near the found element (unless user manually moved it).
+  // Tries right side first, then left, falls back to keeping current position.
+  function repositionNearElement(rect) {
+    if (!trainingEl || training.userMoved) return;
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const widgetRect = trainingEl.getBoundingClientRect();
+    const ww = widgetRect.width || 440;
+    const wh = widgetRect.height || 520;
+    const gap = 24;
+
+    let left;
+    if (rect.right + gap + ww <= vw) {
+      left = rect.right + gap;                     // right of element
+    } else if (rect.left - gap - ww >= 0) {
+      left = rect.left - gap - ww;                 // left of element
+    } else {
+      left = vw - ww - 16;                         // right edge of viewport
+    }
+
+    // Vertically center on element, clamped to viewport
+    let top = rect.top + rect.height / 2 - wh / 2;
+    top = Math.max(16, Math.min(top, vh - wh - 16));
+
+    trainingEl.style.left = `${Math.round(left)}px`;
+    trainingEl.style.top = `${Math.round(top)}px`;
+    trainingEl.style.right = 'auto';
   }
 
   function highlightStep(step) {
@@ -377,10 +471,42 @@
       } catch {}
     }
 
-    // If element not found or on wrong page — show a floating callout at top of screen
+    // Fall back to aria-label match (handles dynamic/canvas elements that lack stable IDs)
+    if ((!el || el === document.body) && step.element.aria_label) {
+      const targetAria = step.element.aria_label.trim().toLowerCase();
+      const ariaEls = document.querySelectorAll('[aria-label]');
+      for (const ae of ariaEls) {
+        if ((ae.getAttribute('aria-label') || '').trim().toLowerCase() === targetAria) {
+          el = /** @type {HTMLElement} */ (ae);
+          break;
+        }
+      }
+    }
+
+    // Fall back to text-content match on leaf-ish nodes (e.g. Gantt chart bars, menu items)
+    if ((!el || el === document.body) && step.element.text) {
+      const targetText = step.element.text.trim().toLowerCase();
+      if (targetText.length >= 2) {
+        const candidates = document.querySelectorAll(
+          'button, a, [role="button"], [role="menuitem"], [role="option"], td, th, li, span, div',
+        );
+        for (const candidate of candidates) {
+          if (candidate.closest?.('#__hoponai_training__')) continue;
+          // Only match when the node itself (not a large container) carries the text
+          const ownText = (candidate.textContent || '').trim().toLowerCase();
+          if (
+            ownText === targetText ||
+            (targetText.length > 4 && candidate.children.length <= 2 && ownText === targetText)
+          ) {
+            el = /** @type {HTMLElement} */ (candidate);
+            break;
+          }
+        }
+      }
+    }
+
+    // Element not found — guidance is in the widget step card (screenshot + instruction)
     if (!el || el === document.body || el.closest?.('#__hoponai_training__')) {
-      const instruction = step.instruction ? stripHtml(step.instruction) : '';
-      if (instruction) showFloatingCallout(instruction);
       return;
     }
 
@@ -412,6 +538,9 @@
       ].join(';');
       document.body.appendChild(hl);
       highlightEl = hl;
+
+      // Reposition widget to sit next to the highlighted element
+      repositionNearElement(rect);
 
       // ── Action callout tooltip ──────────────────────────────────────────────
       const instruction = step.instruction ? stripHtml(step.instruction) : '';
@@ -519,15 +648,15 @@
       </div>
 
       ${minimized ? '' : `
-      <div style="padding:12px;background:#F8FAFC;border-bottom:1px solid #E8ECF2;flex-shrink:0">
-        <div style="display:flex;align-items:flex-start;gap:8px">
-          <div style="width:26px;height:26px;border-radius:50%;background:#0EA5E9;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">${stepIndex + 1}</div>
-          <div style="font-size:12px;font-weight:600;color:#1A1D26;line-height:1.5">${esc(stripHtml(step.instruction || 'Follow the step shown'))}</div>
+      <div style="background:#F8FAFC;border-bottom:1px solid #E8ECF2;flex-shrink:0">
+        ${step.screenshot ? `<div style="border-bottom:1px solid #E8ECF2;overflow:hidden;max-height:160px;cursor:pointer" id="__hp_ss__"><img src="${step.screenshot}" alt="Step ${stepIndex + 1}" style="width:100%;display:block;object-fit:cover;object-position:top"/></div>` : ''}
+        <div style="padding:10px 12px;display:flex;align-items:flex-start;gap:8px">
+          <div style="width:22px;height:22px;border-radius:50%;background:#0EA5E9;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${stepIndex + 1}</div>
+          <div style="font-size:12px;font-weight:600;color:#1A1D26;line-height:1.55">${esc(stripHtml(step.instruction || 'Follow the step shown'))}</div>
         </div>
-        ${step.screenshot ? `<div style="margin-top:10px;border-radius:7px;overflow:hidden;border:1px solid #E8ECF2"><img src="${step.screenshot}" alt="Step ${stepIndex + 1}" style="width:100%;display:block"/></div>` : ''}
       </div>
 
-      <div id="__hp_chat__" style="overflow-y:auto;padding:10px;min-height:60px;max-height:180px">
+      <div id="__hp_chat__" style="overflow-y:auto;padding:10px;min-height:80px;max-height:220px">
         ${chatBubbles}${typingEl}
       </div>
 
@@ -539,8 +668,13 @@
       </div>
 
       <div style="padding:8px 12px;border-top:1px solid #E8ECF2;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:#fff">
-        <button id="__hp_prev__" style="padding:6px 14px;border-radius:7px;background:#F1F5F9;color:#4A5168;font-size:12px;font-weight:600;border:none;opacity:${stepIndex === 0 ? '0.4' : '1'}">← Back</button>
-        <button id="__hp_next__" style="padding:6px 16px;border-radius:7px;background:#0EA5E9;color:#fff;font-size:12px;font-weight:600;border:none">${isLast ? 'Done ✓' : 'Got it →'}</button>
+        ${training.pendingSkipConfirm ? `
+          <button id="__hp_retry__" style="padding:6px 14px;border-radius:7px;background:#F1F5F9;color:#4A5168;font-size:12px;font-weight:600;border:none">↩ Try again</button>
+          <button id="__hp_skip__" style="padding:6px 16px;border-radius:7px;background:#6366F1;color:#fff;font-size:12px;font-weight:600;border:none">Skip →</button>
+        ` : `
+          <button id="__hp_prev__" style="padding:6px 14px;border-radius:7px;background:#F1F5F9;color:#4A5168;font-size:12px;font-weight:600;border:none;opacity:${stepIndex === 0 ? '0.4' : '1'}">← Back</button>
+          <button id="__hp_next__" style="padding:6px 16px;border-radius:7px;background:#0EA5E9;color:#fff;font-size:12px;font-weight:600;border:none">${isLast ? 'Done ✓' : 'Got it →'}</button>
+        `}
       </div>
       `}
     `;
@@ -563,16 +697,52 @@
     });
 
     if (!minimized) {
-      trainingEl.querySelector('#__hp_prev__').addEventListener('click', () => {
-        if (training.stepIndex > 0 && !training.isTyping) {
-          training.stepIndex--;
-          highlightStep(training.steps[training.stepIndex]);
-          renderWidget();
-          scrollChat();
-        }
-      });
+      if (training.pendingSkipConfirm) {
+        // Try again: clear the flag, stay on step, re-render
+        trainingEl.querySelector('#__hp_retry__').addEventListener('click', () => {
+          training.pendingSkipConfirm = false;
+          renderWidget(); scrollChat();
+        });
+        // Skip: advance past the unverified step
+        trainingEl.querySelector('#__hp_skip__').addEventListener('click', () => {
+          training.pendingSkipConfirm = false;
+          doAdvance();
+        });
+      } else {
+        trainingEl.querySelector('#__hp_prev__').addEventListener('click', async () => {
+          if (training.stepIndex > 0 && !training.isTyping) {
+            training.stepIndex--;
+            training.pendingSkipConfirm = false;
+            highlightStep(training.steps[training.stepIndex]);
+            // Ask Sarah how to undo / what to do at the previous step
+            const userMsg = 'I want to go back and redo the previous step.';
+            const updatedHistory = [...training.chatHistory, { role: 'user', content: userMsg }];
+            training.chatHistory = updatedHistory;
+            training.isTyping = true;
+            renderWidget(); scrollChat();
+            try {
+              const { reply } = await callSarahPlay(updatedHistory, 'chat');
+              training.isTyping = false;
+              if (!trainingEl) return;
+              const prevInstruction = stripHtml(training.steps[training.stepIndex]?.instruction || '');
+              const msg = reply || `Of course! Let's go back. Here's what to do: ${prevInstruction}`;
+              training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
+            } catch { training.isTyping = false; }
+            renderWidget(); scrollChat();
+          }
+        });
 
-      trainingEl.querySelector('#__hp_next__').addEventListener('click', () => handleNext());
+        trainingEl.querySelector('#__hp_next__').addEventListener('click', () => handleNext());
+      }
+
+      // Click screenshot to expand/collapse it
+      const ssEl = trainingEl.querySelector('#__hp_ss__');
+      if (ssEl) {
+        ssEl.addEventListener('click', () => {
+          const expanded = ssEl.style.maxHeight === 'none';
+          ssEl.style.maxHeight = expanded ? '160px' : 'none';
+        });
+      }
 
       trainingEl.querySelector('#__hp_snd__').addEventListener('click', () => sendChatMessage());
 
@@ -594,16 +764,34 @@
 
   async function callSarahPlay(history, mode = 'chat') {
     const { steps, stepIndex, title } = training;
-    // Send all step instructions + URLs — Sarah uses these to determine position
-    const allSteps = steps.map((s) => ({ instruction: s.instruction || '', url: s.url || '' }));
+    // Include element metadata — Sarah uses text/tag/aria as evidence of click completion
+    const allSteps = steps.map((s) => ({
+      instruction: s.instruction || '',
+      url: s.url || '',
+      elementText: (s.element?.text || '').slice(0, 60),
+      elementTag: s.element?.tag || '',
+      elementAria: s.element?.aria_label || '',
+    }));
 
-    // For observe mode: send a single fresh message, NOT the chat history.
-    // Sending history causes Sarah to anchor on her own previous wrong answers
-    // (e.g., she said "I don't see that done yet" so she keeps thinking that).
-    // Visual position detection should be based purely on the current screenshot.
-    const messages = mode === 'observe'
-      ? [{ role: 'user', content: 'Look at this screenshot and tell me which step I am currently at.' }]
-      : history;
+    let messages;
+    if (mode === 'observe') {
+      // Focused binary question: "did I complete THIS step?" — not open-ended scan.
+      // Sending chat history causes Sarah to anchor on her own previous wrong answers.
+      const step = steps[stepIndex] || {};
+      const instruction = stripHtml(step.instruction || '');
+      const elemText = (step.element?.text || '').slice(0, 60);
+      const elemTag = step.element?.tag || '';
+      const elemAria = step.element?.aria_label || '';
+      const elemInfo = elemText
+        ? ` The target element is <${elemTag || 'element'}> with text "${elemText}"${elemAria ? ` (aria: "${elemAria}")` : ''}.`
+        : (elemAria ? ` The target element has aria-label "${elemAria}".` : '');
+      messages = [{
+        role: 'user',
+        content: `I'm on step [${stepIndex}]: "${instruction}".${elemInfo} Look at this screenshot — did I complete this step? Has the result of the action appeared on screen?`,
+      }];
+    } else {
+      messages = history;
+    }
 
     const result = await chrome.runtime.sendMessage({
       type: 'CALL_SARAH_PLAY',
@@ -640,6 +828,7 @@
       setObservingIndicator(false);
 
       if (detectedStep > training.stepIndex) {
+        lastAdvancementTime = Date.now(); // cooldown starts now
         training.stepIndex = detectedStep;
         highlightStep(training.steps[training.stepIndex]);
         if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
@@ -654,13 +843,41 @@
   }
 
   function scheduleAutoObserve() {
+    // Suppress auto-observe for 5s after any advance (or recent "Got it") to prevent noise
+    if (Date.now() - lastAdvancementTime < 5000) return;
     clearTimeout(observeDebounceTimer);
-    observeDebounceTimer = setTimeout(autoObserve, 1500);
+    observeDebounceTimer = setTimeout(autoObserve, 2000);
   }
 
   function cancelAutoObserve() {
     clearTimeout(observeDebounceTimer);
     observeDebounceTimer = null;
+  }
+
+  // Get a comparable signature from a URL: pathname + hash (covers SPA hash routing)
+  function urlSig(url) {
+    try { const u = new URL(url); return (u.pathname + u.hash).toLowerCase(); }
+    catch { return url.toLowerCase(); }
+  }
+
+  // Find the first future step whose recorded URL matches the current URL.
+  // Used for instant no-AI advancement when the user navigates to a new page.
+  function matchStepByUrl(currentUrl) {
+    const sig = urlSig(currentUrl);
+    for (let i = training.stepIndex + 1; i < training.steps.length; i++) {
+      const stepUrl = training.steps[i].url || '';
+      if (stepUrl && urlSig(stepUrl) === sig) return i;
+    }
+    return -1;
+  }
+
+  // Advance to a specific step index via URL match — jump ahead if multiple steps matched.
+  function advanceToStep(targetStep) {
+    if (!trainingEl) return;
+    if (targetStep <= training.stepIndex || targetStep >= training.steps.length) return;
+    training.pendingSkipConfirm = false;
+    training.stepIndex = targetStep - 1; // doAdvance will increment by 1
+    doAdvance();
   }
 
   function startUrlPolling() {
@@ -671,7 +888,13 @@
       if (current !== training.lastUrl) {
         training.lastUrl = current;
         cancelAutoObserve();
-        setTimeout(autoObserve, 500);  // small settle delay for SPA render
+        // First try URL-based step matching — instant, no AI needed
+        const matched = matchStepByUrl(current);
+        if (matched > training.stepIndex) {
+          setTimeout(() => advanceToStep(matched), 300); // brief render-settle delay
+        } else {
+          setTimeout(autoObserve, 800); // URL changed but no direct match — let Sarah observe
+        }
       }
     }, 1000);
   }
@@ -733,61 +956,70 @@
     scrollChat();
   }
 
-  // "Got it →" fallback: user manually triggers an observe call.
-  // Always shows Sarah's reply (unlike auto-observe which is silent on no progress).
+  // Advance one step with a confirmation message — shared by URL detection, skip, error paths.
+  function doAdvance() {
+    if (!trainingEl) return;
+    const { steps } = training;
+    if (training.stepIndex + 1 >= steps.length) return;
+    training.stepIndex++;
+    training.pendingSkipConfirm = false;
+    lastAdvancementTime = Date.now();
+    highlightStep(steps[training.stepIndex]);
+    const nextInstruction = stripHtml(steps[training.stepIndex]?.instruction || '');
+    const msg = nextInstruction ? `✓ Moving on! Now: ${nextInstruction}` : '✓ Keep going!';
+    training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
+    renderWidget(); scrollChat();
+  }
+
+  // "Got it →": take a quick screenshot and ask Sarah if the step looks done.
+  // If yes → advance. If no → show "Try again / Skip" options.
+  // User is never blocked: Skip always works.
   async function handleNext() {
     if (!trainingEl || training.isTyping) return;
     const { steps, stepIndex } = training;
     const isLast = stepIndex + 1 >= steps.length;
 
     if (isLast) {
-      const updatedHistory = [...training.chatHistory, { role: 'user', content: 'I completed the last step!' }];
-      training.chatHistory = updatedHistory;
-      training.isTyping = true;
-      renderWidget();
-      scrollChat();
-      try {
-        const { reply } = await callSarahPlay(updatedHistory, 'chat');
-        training.isTyping = false;
-        if (!trainingEl) return;
-        if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
-      } catch {
-        training.isTyping = false;
-      }
-      renderWidget();
-      scrollChat();
+      const msg = "🎉 You've completed all the steps! Great work!";
+      training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
+      renderWidget(); scrollChat();
       return;
     }
 
     cancelAutoObserve();
+    training.pendingSkipConfirm = false;
     training.isTyping = true;
-    renderWidget();
-    scrollChat();
+    renderWidget(); scrollChat();
 
     try {
       const { reply, detectedStep } = await callSarahPlay(training.chatHistory, 'observe');
       training.isTyping = false;
       if (!trainingEl) return;
+
       if (detectedStep > training.stepIndex) {
+        // Sarah confirms it's done — advance
         training.stepIndex = detectedStep;
-        highlightStep(training.steps[training.stepIndex]);
+        lastAdvancementTime = Date.now();
+        highlightStep(steps[training.stepIndex]);
+        const nextInstruction = stripHtml(steps[training.stepIndex]?.instruction || '');
+        training.chatHistory = [...training.chatHistory, {
+          role: 'assistant',
+          content: `✓ Got it! Now: ${nextInstruction}`,
+        }];
+      } else {
+        // Sarah says not done yet — offer options, never block
+        const msg = "That doesn't look done yet 😊 Want to try again, or skip for now?";
+        training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
+        training.pendingSkipConfirm = true;
       }
-      // Always surface a reply — user pressed the button and expects feedback
-      const step = training.steps[training.stepIndex] || {};
-      const instruction = stripHtml(step.instruction || '');
-      const fallback = detectedStep > training.stepIndex
-        ? `Great job! Moving to the next step.`
-        : instruction
-          ? `I don't see that done yet — ${instruction.charAt(0).toLowerCase() + instruction.slice(1)}`
-          : "I don't see that done yet — check the highlighted element on screen.";
-      const msg = reply || fallback;
-      training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
     } catch {
+      // On error, advance anyway — never leave user stuck
       training.isTyping = false;
+      doAdvance();
+      return;
     }
 
-    renderWidget();
-    scrollChat();
+    renderWidget(); scrollChat();
   }
 
   // ─── Draggable ──────────────────────────────────────────────────────────────
@@ -801,6 +1033,7 @@
       const tgt = /** @type {Element} */ (e.target);
       if (!tgt.closest('#__hp_hdr__') || tgt.closest('button')) return;
       dragging = true;
+      training.userMoved = true; // disable auto-reposition once user takes control
       const rect = trainingEl.getBoundingClientRect();
       startX = e.clientX; startY = e.clientY;
       startLeft = rect.left; startTop = rect.top;

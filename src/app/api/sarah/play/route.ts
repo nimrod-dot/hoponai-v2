@@ -16,12 +16,15 @@ Rules:
 - Never say "step N" by number — describe actions naturally
 
 OBSERVE MODE (mode = observe):
-- Look at the screenshot and compare it to the walkthrough step list provided
-- Identify which step best describes what you see RIGHT NOW — the user may have skipped multiple steps
-- If no advancement from the current step, keep detectedStep the same
+- You are checking if the user completed ONE specific step — the CURRENT step only
+- The current step index, its instruction, and the target element (text, tag, aria) are provided
+- DO NOT scan all steps — focus ONLY on whether the current step's action produced a visible result
+- Look for EVIDENCE the action occurred: a dialog opened, panel appeared, item got selected/highlighted, navigation happened, button state changed
+- If you see CLEAR EVIDENCE the current step was completed → set detectedStep = currentStepIndex + 1
+- If NOT clearly completed → set detectedStep = currentStepIndex (no change)
 - Respond ONLY with JSON: {"detectedStep": <0-indexed number>, "reply": "<message or empty string>"}
-- Set reply to "" when there is no advancement (silent observation)
-- Set reply to a brief acknowledgment when advancement is detected ("I can see the project dialog opened! Now...")
+- Set reply to "" when step is NOT complete yet — stay completely silent, never say "I don't see that"
+- Set reply to a brief warm confirmation ONLY when advancement detected ("The task detail panel is open! Now...")
 
 GREET MODE (mode = greet):
 - Welcome warmly and narrate step [0] — what the user needs to do first
@@ -56,7 +59,7 @@ export async function POST(req: NextRequest) {
 
   // Map legacy fields to new model
   const resolvedMode: 'greet' | 'observe' | 'chat' = isGreeting ? 'greet' : mode;
-  const resolvedSteps: { instruction: string; url: string }[] =
+  const resolvedSteps: { instruction: string; url: string; elementText?: string; elementTag?: string; elementAria?: string }[] =
     allSteps ?? (stepInstruction ? [{ instruction: stepInstruction, url: '' }] : []);
 
   const stepsText = resolvedSteps
@@ -64,7 +67,12 @@ export async function POST(req: NextRequest) {
       const path = s.url
         ? (() => { try { return new URL(s.url).pathname; } catch { return s.url; } })()
         : '';
-      return `  [${i}] ${s.instruction}${path ? `  (${path})` : ''}`;
+      const elemParts: string[] = [];
+      if (s.elementText) elemParts.push(`text:"${String(s.elementText).slice(0, 50)}"`);
+      if (s.elementTag)  elemParts.push(`tag:<${s.elementTag}>`);
+      if (s.elementAria) elemParts.push(`aria:"${String(s.elementAria).slice(0, 50)}"`);
+      const elemInfo = elemParts.length ? `  [target: ${elemParts.join(', ')}]` : '';
+      return `  [${i}] ${s.instruction}${elemInfo}${path ? `  (${path})` : ''}`;
     })
     .join('\n');
 
@@ -73,7 +81,7 @@ export async function POST(req: NextRequest) {
     `Current step index (0-based): ${stepIndex} of ${totalSteps - 1}`,
     resolvedSteps.length > 0 ? `\nFull walkthrough steps:\n${stepsText}` : '',
     `\nMode: ${resolvedMode}`,
-    resolvedMode === 'observe' ? 'Look at the attached screenshot and return JSON {"detectedStep": N, "reply": "..."}.' : '',
+    resolvedMode === 'observe' ? `TASK: Determine if step [${stepIndex}] is completed. Look for evidence the action occurred. Return detectedStep = ${stepIndex + 1} if DONE, ${stepIndex} if NOT DONE.` : '',
     resolvedMode === 'greet'   ? 'This is the very start. Greet warmly and narrate step [0].' : '',
     resolvedMode === 'chat'    ? `User is working on step [${stepIndex}]. Respond conversationally.` : '',
     stepIndex + 1 >= totalSteps ? 'This is the FINAL step — congratulate when done.' : '',
