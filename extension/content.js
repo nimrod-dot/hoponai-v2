@@ -303,6 +303,53 @@
     if (highlightEl) { highlightEl.remove(); highlightEl = null; }
   }
 
+  // Floating callout shown at top of page when the target element can't be found
+  // (e.g. user is on a different page than where the element was recorded)
+  function showFloatingCallout(instruction) {
+    ensureHlStyles();
+    const ct = document.createElement('div');
+    ct.id = '__hoponai_callout__';
+    ct.style.cssText = [
+      'position:fixed',
+      'top:16px',
+      'left:50%',
+      'transform:translateX(-50%)',
+      'max-width:320px',
+      'background:#0F172A',
+      'color:#fff',
+      'font-size:12px',
+      'line-height:1.5',
+      'padding:10px 16px',
+      'border-radius:12px',
+      'pointer-events:none',
+      'z-index:2147483647',
+      `font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif`,
+      'box-shadow:0 4px 20px rgba(0,0,0,0.4)',
+      'display:flex',
+      'align-items:center',
+      'gap:8px',
+      'animation:__hp_callout__ 2.5s ease-in-out infinite',
+      'white-space:normal',
+    ].join(';');
+    ct.innerHTML = `<span style="font-size:16px;flex-shrink:0">👆</span><span>${esc(instruction)}</span>`;
+    document.body.appendChild(ct);
+    calloutEl = ct;
+  }
+
+  function ensureHlStyles() {
+    if (document.getElementById('__hp_hl_style__')) return;
+    const s = document.createElement('style');
+    s.id = '__hp_hl_style__';
+    s.textContent = [
+      '@keyframes __hp_ring__{',
+      '0%,100%{box-shadow:0 0 0 4000px rgba(0,0,0,0.38),0 0 0 0 rgba(14,165,233,0.6),0 0 12px 2px rgba(14,165,233,0.4)}',
+      '50%{box-shadow:0 0 0 4000px rgba(0,0,0,0.38),0 0 0 6px rgba(14,165,233,0.15),0 0 20px 4px rgba(14,165,233,0.2)}',
+      '}',
+      '@keyframes __hp_callout__{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(-3px)}}',
+    ].join('');
+    document.head.appendChild(s);
+  }
+
   // Strip HTML tags from AI-generated instructions (they sometimes include <div> etc.)
   function stripHtml(str) {
     return String(str).replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
@@ -330,8 +377,12 @@
       } catch {}
     }
 
-    // Skip if not found, is body, or is inside the training widget itself
-    if (!el || el === document.body || el.closest?.('#__hoponai_training__')) return;
+    // If element not found or on wrong page — show a floating callout at top of screen
+    if (!el || el === document.body || el.closest?.('#__hoponai_training__')) {
+      const instruction = step.instruction ? stripHtml(step.instruction) : '';
+      if (instruction) showFloatingCallout(instruction);
+      return;
+    }
 
     el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
 
@@ -341,21 +392,7 @@
       const rect = el.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) return;
 
-      // Inject keyframes once
-      if (!document.getElementById('__hp_hl_style__')) {
-        const s = document.createElement('style');
-        s.id = '__hp_hl_style__';
-        s.textContent = [
-          // Spotlight: pulsing border + dark backdrop via box-shadow spread
-          '@keyframes __hp_ring__{',
-          '0%,100%{box-shadow:0 0 0 4000px rgba(0,0,0,0.38),0 0 0 0 rgba(14,165,233,0.6),0 0 12px 2px rgba(14,165,233,0.4)}',
-          '50%{box-shadow:0 0 0 4000px rgba(0,0,0,0.38),0 0 0 6px rgba(14,165,233,0.15),0 0 20px 4px rgba(14,165,233,0.2)}',
-          '}',
-          // Callout pulse
-          '@keyframes __hp_callout__{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}',
-        ].join('');
-        document.head.appendChild(s);
-      }
+      ensureHlStyles();
 
       // ── Spotlight div ───────────────────────────────────────────────────────
       const pad = 5;
@@ -409,7 +446,7 @@
         'display:flex',
         'align-items:flex-start',
         'gap:7px',
-        'animation:__hp_callout__ 2.5s ease-in-out infinite',
+        'animation:none',  // no float on element-anchored tooltip; spotlight animation is enough
       ].join(';');
 
       // Arrow indicator + text
@@ -560,9 +597,17 @@
     // Send all step instructions + URLs — Sarah uses these to determine position
     const allSteps = steps.map((s) => ({ instruction: s.instruction || '', url: s.url || '' }));
 
+    // For observe mode: send a single fresh message, NOT the chat history.
+    // Sending history causes Sarah to anchor on her own previous wrong answers
+    // (e.g., she said "I don't see that done yet" so she keeps thinking that).
+    // Visual position detection should be based purely on the current screenshot.
+    const messages = mode === 'observe'
+      ? [{ role: 'user', content: 'Look at this screenshot and tell me which step I am currently at.' }]
+      : history;
+
     const result = await chrome.runtime.sendMessage({
       type: 'CALL_SARAH_PLAY',
-      messages: history,
+      messages,
       context: {
         walkthroughTitle: title,
         stepIndex,
