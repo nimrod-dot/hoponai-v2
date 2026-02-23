@@ -167,8 +167,9 @@
   /** @type {HTMLElement|null} */
   let highlightEl = null;
   let lastHighlightedStepIndex = -1;
-  let lastTrainingClick = null;
   let onPageClickHandler = null;
+  let observeDebounceTimer = null;
+  let urlPollInterval = null;
 
   let training = {
     steps: /** @type {any[]} */ ([]),
@@ -177,6 +178,8 @@
     chatHistory: /** @type {{role:string,content:string}[]} */ ([]),
     isTyping: false,
     minimized: false,
+    isObserving: false,
+    lastUrl: '',
   };
 
   // Entry point: fetch walkthrough data, then show widget
@@ -222,30 +225,24 @@
         minimized: false,
       };
 
-      // Track page clicks so Sarah can use them as primary verification evidence
-      lastTrainingClick = null;
+      // Listen for page clicks to schedule proactive auto-observation
       if (onPageClickHandler) {
         document.removeEventListener('click', onPageClickHandler, { capture: true });
       }
       onPageClickHandler = (e) => {
-        if (!trainingEl) return;
+        if (!trainingEl || training.isTyping) return;
+        if (training.stepIndex + 1 >= training.steps.length) return;
         const el = e.target;
         if (el.closest?.('#__hoponai_training__') || el.closest?.('#__hoponai_hl__')) return;
-        lastTrainingClick = {
-          text: (el.textContent || '').trim().slice(0, 80),
-          ariaLabel: el.getAttribute?.('aria-label') || '',
-          placeholder: el.getAttribute?.('placeholder') || '',
-          tag: (el.tagName || 'unknown').toLowerCase(),
-          id: el.id || '',
-          timestamp: Date.now(),
-        };
+        scheduleAutoObserve();
       };
       document.addEventListener('click', onPageClickHandler, { capture: true, passive: true });
 
       renderWidget();
       makeDraggable();
       highlightStep(steps[0]);
-      sarahNarrate(true);
+      startUrlPolling();
+      sarahNarrate();
 
     } catch (err) {
       showWidgetError('Network error. Check your connection and try again.');
@@ -287,11 +284,12 @@
   function removeTrainingWidget() {
     removeHighlight();
     lastHighlightedStepIndex = -1;
+    cancelAutoObserve();
+    stopUrlPolling();
     if (onPageClickHandler) {
       document.removeEventListener('click', onPageClickHandler, { capture: true });
       onPageClickHandler = null;
     }
-    lastTrainingClick = null;
     if (trainingEl) {
       trainingEl.remove();
       trainingEl = null;
@@ -403,6 +401,7 @@
 
     trainingEl.innerHTML = `
       <style>@keyframes __hp_b__{0%,80%,100%{transform:scale(1);opacity:.6}40%{transform:scale(1.3);opacity:1}}
+      @keyframes __hp_watch__{0%,100%{opacity:0.3}50%{opacity:1}}
       #__hoponai_training__ *{box-sizing:border-box}
       #__hoponai_training__ button{cursor:pointer;border:none;font-family:inherit}
       #__hoponai_training__ input{font-family:inherit}</style>
@@ -411,6 +410,7 @@
         <div style="display:flex;align-items:center;gap:8px">
           <span style="font-family:Georgia,serif;font-size:14px;color:#1A1D26">hopon<span style="color:#0EA5E9">ai</span></span>
           <span style="font-size:11px;color:#8B92A5;font-weight:500">${stepIndex + 1}/${total}</span>
+          <div id="__hp_watch__" title="Sarah is watching" style="width:7px;height:7px;border-radius:50%;background:#0EA5E9;opacity:0;transition:opacity 0.3s;flex-shrink:0;${training.isObserving ? 'animation:__hp_watch__ 1.5s ease-in-out infinite' : ''}"></div>
         </div>
         <div style="display:flex;gap:4px">
           <button id="__hp_min__" style="width:22px;height:22px;border-radius:50%;background:#E8ECF2;color:#4A5168;font-size:14px;display:flex;align-items:center;justify-content:center">${minimized ? '+' : '−'}</button>
@@ -494,17 +494,13 @@
     if (chat) setTimeout(() => { chat.scrollTop = chat.scrollHeight; }, 30);
   }
 
-  async function callSarahPlay(history, verifyCompletion = false, isGreeting = false) {
+  // ─── Sarah AI Calls ───────────────────────────────────────────────────────────
+
+  async function callSarahPlay(history, mode = 'chat') {
     const { steps, stepIndex, title } = training;
-    const step = steps[stepIndex] || {};
-    const nextStep = steps[stepIndex + 1] || {};
+    // Send all step instructions + URLs — Sarah uses these to determine position
+    const allSteps = steps.map((s) => ({ instruction: s.instruction || '', url: s.url || '' }));
 
-    const msSinceClick = lastTrainingClick ? Date.now() - lastTrainingClick.timestamp : null;
-    const recentClick = (lastTrainingClick && msSinceClick < 30000)
-      ? { ...lastTrainingClick, msSinceClick }
-      : null;
-
-    // Route through background service worker to avoid CORS
     const result = await chrome.runtime.sendMessage({
       type: 'CALL_SARAH_PLAY',
       messages: history,
@@ -512,45 +508,97 @@
         walkthroughTitle: title,
         stepIndex,
         totalSteps: steps.length,
-        stepInstruction: step.instruction || '',
-        nextInstruction: verifyCompletion ? (nextStep.instruction || '') : '',
-        verifyCompletion,
-        isGreeting,
-        skipScreenshot: isGreeting,
-        lastClickedElement: recentClick,
+        allSteps,
+        mode,
       },
     });
 
     return {
-      reply: result?.reply || null,
-      // When not verifying, always advance. When verifying, trust Sarah's answer
-      // (default true if result is missing — never block the user permanently).
-      stepVerified: result?.stepVerified ?? !verifyCompletion,
+      reply: result?.reply ?? null,
+      detectedStep: result?.detectedStep ?? stepIndex,
     };
   }
 
-  async function sarahNarrate(isGreeting = false) {
+  // Auto-observe: proactively checks the screen after page clicks / URL changes.
+  // Silent when no advancement — only updates chat if Sarah detects progress.
+  async function autoObserve() {
+    if (!trainingEl || training.isTyping || training.isObserving) return;
+    if (training.minimized) return;
+    if (training.stepIndex + 1 >= training.steps.length) return;
+
+    training.isObserving = true;
+    setObservingIndicator(true);
+
+    try {
+      const { reply, detectedStep } = await callSarahPlay(training.chatHistory, 'observe');
+      if (!trainingEl) return;
+      training.isObserving = false;
+      setObservingIndicator(false);
+
+      if (detectedStep > training.stepIndex) {
+        training.stepIndex = detectedStep;
+        highlightStep(training.steps[training.stepIndex]);
+        if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
+        renderWidget();
+        scrollChat();
+      }
+      // No advancement → silent, don't re-render, don't touch chat
+    } catch {
+      training.isObserving = false;
+      setObservingIndicator(false);
+    }
+  }
+
+  function scheduleAutoObserve() {
+    clearTimeout(observeDebounceTimer);
+    observeDebounceTimer = setTimeout(autoObserve, 1500);
+  }
+
+  function cancelAutoObserve() {
+    clearTimeout(observeDebounceTimer);
+    observeDebounceTimer = null;
+  }
+
+  function startUrlPolling() {
+    training.lastUrl = window.location.href;
+    urlPollInterval = setInterval(() => {
+      if (!trainingEl) { clearInterval(urlPollInterval); return; }
+      const current = window.location.href;
+      if (current !== training.lastUrl) {
+        training.lastUrl = current;
+        cancelAutoObserve();
+        setTimeout(autoObserve, 500);  // small settle delay for SPA render
+      }
+    }, 1000);
+  }
+
+  function stopUrlPolling() {
+    clearInterval(urlPollInterval);
+    urlPollInterval = null;
+  }
+
+  function setObservingIndicator(visible) {
+    const dot = trainingEl?.querySelector('#__hp_watch__');
+    if (dot) dot.style.opacity = visible ? '1' : '0';
+  }
+
+  // Greeting: called once when widget loads. Uses 'greet' mode — no screenshot.
+  async function sarahNarrate() {
     if (!trainingEl) return;
-
-    const userMsg = isGreeting
-      ? `I'm ready to follow "${training.title}". Tell me what to do first!`
-      : `Got it! What do I do next on step ${training.stepIndex + 1}?`;
-
-    const updatedHistory = [...training.chatHistory, { role: 'user', content: userMsg }];
+    const userMsg = `I'm ready to follow "${training.title}". Tell me what to do first!`;
+    const updatedHistory = [{ role: 'user', content: userMsg }];
     training.chatHistory = updatedHistory;
     training.isTyping = true;
     renderWidget();
     scrollChat();
-
     try {
-      const { reply } = await callSarahPlay(updatedHistory, false, isGreeting);
+      const { reply } = await callSarahPlay(updatedHistory, 'greet');
       training.isTyping = false;
       if (!trainingEl) return;
       if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
     } catch {
       training.isTyping = false;
     }
-
     renderWidget();
     scrollChat();
   }
@@ -569,7 +617,7 @@
     scrollChat();
 
     try {
-      const { reply } = await callSarahPlay(updatedHistory);
+      const { reply } = await callSarahPlay(updatedHistory, 'chat');
       training.isTyping = false;
       if (!trainingEl) return;
       if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
@@ -581,38 +629,48 @@
     scrollChat();
   }
 
+  // "Got it →" fallback: user manually triggers an observe call.
+  // Always shows Sarah's reply (unlike auto-observe which is silent on no progress).
   async function handleNext() {
     if (!trainingEl || training.isTyping) return;
     const { steps, stepIndex } = training;
     const isLast = stepIndex + 1 >= steps.length;
 
-    // Ask Sarah to verify the current step from the screenshot before advancing.
-    // We do NOT increment stepIndex yet — Sarah decides whether we move forward.
-    const userMsg = isLast
-      ? 'I completed the last step!'
-      : 'I think I completed this step — can you check the screen and confirm?';
-    const updatedHistory = [...training.chatHistory, { role: 'user', content: userMsg }];
-    training.chatHistory = updatedHistory;
+    if (isLast) {
+      const updatedHistory = [...training.chatHistory, { role: 'user', content: 'I completed the last step!' }];
+      training.chatHistory = updatedHistory;
+      training.isTyping = true;
+      renderWidget();
+      scrollChat();
+      try {
+        const { reply } = await callSarahPlay(updatedHistory, 'chat');
+        training.isTyping = false;
+        if (!trainingEl) return;
+        if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
+      } catch {
+        training.isTyping = false;
+      }
+      renderWidget();
+      scrollChat();
+      return;
+    }
+
+    cancelAutoObserve();
     training.isTyping = true;
     renderWidget();
     scrollChat();
 
     try {
-      // Pass verifyCompletion=true for non-final steps so Sarah checks the screenshot
-      const { reply, stepVerified } = await callSarahPlay(updatedHistory, !isLast);
+      const { reply, detectedStep } = await callSarahPlay(training.chatHistory, 'observe');
       training.isTyping = false;
       if (!trainingEl) return;
-
-      if (reply) {
-        training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
-      }
-
-      // Only advance when Sarah confirms the step is done in the screenshot
-      if (!isLast && stepVerified) {
-        training.stepIndex = stepIndex + 1;
-        lastTrainingClick = null;  // clear so old click doesn't affect the next step
+      if (detectedStep > training.stepIndex) {
+        training.stepIndex = detectedStep;
         highlightStep(training.steps[training.stepIndex]);
       }
+      // Always surface a reply — user pressed the button and expects feedback
+      const msg = reply || "I can see you're making progress — keep going!";
+      training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
     } catch {
       training.isTyping = false;
     }

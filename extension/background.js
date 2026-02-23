@@ -239,11 +239,9 @@ async function bgCallSarahPlay(messages, context, tabId) {
   const stored = await chrome.storage.local.get('extension_token');
   const token = stored.extension_token || null;
 
-  // Capture a screenshot so Sarah can see the current screen state.
-  // Skip on the initial greeting (context.skipScreenshot=true) to prevent Sarah
-  // from misinterpreting incidental on-screen state as an already-completed step.
+  // Capture screenshot only for 'observe' mode — greet and chat don't need it.
   let screenshot = null;
-  if (!context.skipScreenshot) {
+  if (context.mode === 'observe') {
     try {
       if (tabId) {
         const tab = await chrome.tabs.get(tabId);
@@ -253,7 +251,7 @@ async function bgCallSarahPlay(messages, context, tabId) {
         });
       }
     } catch {
-      // Capture may fail if tab is not visible — proceed without screenshot
+      // Tab may not be visible — Sarah observes without screenshot
     }
   }
 
@@ -268,8 +266,8 @@ async function bgCallSarahPlay(messages, context, tabId) {
     });
     if (!res.ok) return { ok: false };
     const data = await res.json();
-    // Forward stepVerified so content.js can gate whether to advance the step
-    return { ok: true, reply: data.reply, stepVerified: data.stepVerified };
+    // Forward detectedStep so content.js can advance when Sarah sees progress
+    return { ok: true, reply: data.reply, detectedStep: data.detectedStep };
   } catch {
     return { ok: false };
   }

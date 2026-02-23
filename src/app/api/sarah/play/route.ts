@@ -4,29 +4,31 @@ import { verifyShareToken } from '@/lib/share-token';
 import { verifyExtensionToken, extractBearerToken } from '@/lib/extension-token';
 import { openai } from '@/lib/openai';
 
-const SARAH_PLAY_SYSTEM = `You are Sarah, a warm and concise AI training guide for Hoponai.
-You are walking a user through a recorded software walkthrough step by step.
-You can see a screenshot of what the user currently sees on their screen.
+const SARAH_PLAY_SYSTEM = `You are Sarah, a warm and concise AI training coach for Hoponai.
+You guide users through recorded software walkthroughs step by step.
+You watch the user's screen by looking at screenshots and tell them where they are in their journey.
 
 Rules:
-- LOOK at the screenshot first — understand where the user actually is right now
-- If the current page/view does not match what is needed for the step, tell the user to navigate there first before anything else
-- ALWAYS base your instruction on the exact step instruction provided in the context
-- Describe elements using what you can SEE on screen (button label, color, location) — never use HTML tags, XPath, IDs, or class names
-- If the instruction mentions a "<div>" or similar tag, describe the element by its visible label or position instead
-- Lead with the specific action and location, add one short encouraging sentence
-- Keep the entire reply to 2–3 sentences maximum
-- If they ask a question, answer briefly then redirect to the current step
-- Never say "step X" — describe the action naturally
-- Use a warm coaching tone
+- Describe elements by what you SEE (button label, color, location) — never mention HTML, XPath, IDs, class names
+- Keep every reply to 2 sentences maximum — direct and encouraging
+- Use a warm coaching tone, never robotic
+- If the user asks a question, answer briefly and redirect them to their current step
+- Never say "step N" by number — describe actions naturally
 
-VERIFICATION MODE (when context says "Verify step completion"):
-- The "User's last click" in context is your PRIMARY evidence for click-based actions
-- Screenshots cannot capture transient states: button presses, dropdown interactions, or recently-completed navigation — do not penalize the user for these
-- If the last click text/label matches the required action → verified:true, acknowledge what you saw ("I can see you clicked [X]!")
-- Use screenshot as secondary evidence mainly for text-entry steps (can you see typed text in a field?)
-- When not verified: say specifically what is still missing, don't repeat the full instruction
-- Respond ONLY with valid JSON (no markdown fences): {"verified": true/false, "reply": "1-2 sentence message"}`;
+OBSERVE MODE (mode = observe):
+- Look at the screenshot and compare it to the walkthrough step list provided
+- Identify which step best describes what you see RIGHT NOW — the user may have skipped multiple steps
+- If no advancement from the current step, keep detectedStep the same
+- Respond ONLY with JSON: {"detectedStep": <0-indexed number>, "reply": "<message or empty string>"}
+- Set reply to "" when there is no advancement (silent observation)
+- Set reply to a brief acknowledgment when advancement is detected ("I can see the project dialog opened! Now...")
+
+GREET MODE (mode = greet):
+- Welcome warmly and narrate step [0] — what the user needs to do first
+- Do NOT assume any steps are already done. Respond with plain text (no JSON).
+
+CHAT MODE (mode = chat):
+- The user typed a message. Respond conversationally and keep them on track. Plain text.`;
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -45,42 +47,39 @@ export async function POST(req: NextRequest) {
     walkthroughTitle = 'this walkthrough',
     stepIndex = 0,
     totalSteps = 1,
+    allSteps = null,         // [{instruction: string, url: string}] — new field
+    mode = 'chat',           // 'greet' | 'observe' | 'chat' — new field
+    // Legacy compat fields (PlayerClient.tsx sends these, no changes needed there):
     stepInstruction = '',
-    nextInstruction = '',  // next step's instruction, present only during verification
-    verifyCompletion = false,
     isGreeting = false,
-    lastClickedElement = null,
   } = context;
 
-  const isFinalStep = stepIndex + 1 >= totalSteps;
+  // Map legacy fields to new model
+  const resolvedMode: 'greet' | 'observe' | 'chat' = isGreeting ? 'greet' : mode;
+  const resolvedSteps: { instruction: string; url: string }[] =
+    allSteps ?? (stepInstruction ? [{ instruction: stepInstruction, url: '' }] : []);
 
-  let contextMsg: string;
-  if (verifyCompletion) {
-    const clickLine = lastClickedElement
-      ? `User's last click (${Math.round((lastClickedElement.msSinceClick ?? 0) / 1000)}s ago): ` +
-        `"${lastClickedElement.text || lastClickedElement.ariaLabel}" (${lastClickedElement.tag})` +
-        `\n→ Treat this as PRIMARY evidence. Screenshots miss transient states (dropdown opens, button presses, navigation).`
-      : `No recent click detected — rely on screenshot carefully.`;
+  const stepsText = resolvedSteps
+    .map((s, i) => {
+      const path = s.url
+        ? (() => { try { return new URL(s.url).pathname; } catch { return s.url; } })()
+        : '';
+      return `  [${i}] ${s.instruction}${path ? `  (${path})` : ''}`;
+    })
+    .join('\n');
 
-    contextMsg = [
-      `Verify step completion — Walkthrough: "${walkthroughTitle}"`,
-      `Step ${stepIndex + 1} of ${totalSteps}: "${stepInstruction}"`,
-      clickLine,
-      nextInstruction && `Next step (narrate only if verified): "${nextInstruction}"`,
-      `Respond ONLY with valid JSON: {"verified": true/false, "reply": "1-2 sentence message"}`,
-    ].filter(Boolean).join('\n');
-  } else {
-    contextMsg = [
-      `Walkthrough title: "${walkthroughTitle}"`,
-      `Current step: ${stepIndex + 1} of ${totalSteps}`,
-      stepInstruction && `What the user needs to do right now: "${stepInstruction}"`,
-      isFinalStep && `This is the FINAL step — congratulate them when they complete it.`,
-      isGreeting && `This is the START of the walkthrough. Do NOT assume any steps are already done based on the screenshot. Greet warmly and narrate step 1 fresh.`,
-    ].filter(Boolean).join('\n');
-  }
+  const contextMsg = [
+    `Walkthrough: "${walkthroughTitle}"`,
+    `Current step index (0-based): ${stepIndex} of ${totalSteps - 1}`,
+    resolvedSteps.length > 0 ? `\nFull walkthrough steps:\n${stepsText}` : '',
+    `\nMode: ${resolvedMode}`,
+    resolvedMode === 'observe' ? 'Look at the attached screenshot and return JSON {"detectedStep": N, "reply": "..."}.' : '',
+    resolvedMode === 'greet'   ? 'This is the very start. Greet warmly and narrate step [0].' : '',
+    resolvedMode === 'chat'    ? `User is working on step [${stepIndex}]. Respond conversationally.` : '',
+    stepIndex + 1 >= totalSteps ? 'This is the FINAL step — congratulate when done.' : '',
+  ].filter(Boolean).join('\n');
 
-  // Build chat messages — attach the screenshot to the last user message so
-  // Sarah can see exactly what's on screen when she replies.
+  // Build chat messages — attach screenshot to the last user message (only for observe mode)
   const buildMessages = (
     msgs: { role: string; content: string }[],
     img: string | null,
@@ -102,35 +101,42 @@ export async function POST(req: NextRequest) {
     return [...textMsgs.slice(0, -1), visionMsg];
   };
 
+  // Only attach screenshot in observe mode
+  const imgToAttach = resolvedMode === 'observe' ? screenshot : null;
+
   const openaiMessages = [
     { role: 'system' as const, content: SARAH_PLAY_SYSTEM },
     { role: 'system' as const, content: `Current context:\n${contextMsg}` },
-    ...buildMessages(messages, screenshot),
+    ...buildMessages(messages, imgToAttach),
   ];
 
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: openaiMessages,
     max_tokens: 200,
-    temperature: 0.5,
+    temperature: 0.4,
   });
 
   const rawReply = completion.choices[0].message.content?.trim() ?? '';
 
-  if (verifyCompletion) {
+  if (resolvedMode === 'observe') {
     try {
       // GPT sometimes wraps JSON in markdown fences — strip them
       const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
       const parsed = JSON.parse(jsonMatch?.[0] ?? rawReply);
-      const reply = String(parsed.reply || rawReply);
-      const stepVerified = parsed.verified !== false; // default true on ambiguity
-      return NextResponse.json({ reply, stepVerified });
+      // Clamp: Sarah can never go backward, can never go past last step
+      const detectedStep = typeof parsed.detectedStep === 'number'
+        ? Math.max(stepIndex, Math.min(parsed.detectedStep, totalSteps - 1))
+        : stepIndex;
+      const reply = String(parsed.reply ?? '');
+      return NextResponse.json({ reply, detectedStep });
     } catch {
-      // JSON parse failed — let the user proceed so they're never stuck
-      return NextResponse.json({ reply: rawReply, stepVerified: true });
+      // JSON parse failed — safe default: no advancement, no message
+      return NextResponse.json({ reply: '', detectedStep: stepIndex });
     }
   }
 
-  const reply = rawReply || "Let's keep going — click 'Got it' when you're ready for the next step!";
-  return NextResponse.json({ reply, stepVerified: true });
+  // greet and chat modes: plain text, detectedStep = stepIndex (no position change)
+  const reply = rawReply || "Let's keep going — you've got this!";
+  return NextResponse.json({ reply, detectedStep: stepIndex });
 }
