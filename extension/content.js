@@ -173,6 +173,7 @@
   let observeDebounceTimer = null;
   let urlPollInterval = null;
   let lastAdvancementTime = 0; // cooldown: prevent re-observe right after step advances
+  let highlightTimer = null;  // cancel pending spotlight creation on rapid step changes
 
   let training = {
     steps: /** @type {any[]} */ ([]),
@@ -183,7 +184,6 @@
     minimized: false,
     isObserving: false,
     lastUrl: '',
-    pendingSkipConfirm: false, // true when Sarah says step isn't done → show Try Again / Skip
     userMoved: false,          // true once user manually drags widget — disables auto-position
   };
 
@@ -230,7 +230,6 @@
         minimized: false,
         isObserving: false,
         lastUrl: '',
-        pendingSkipConfirm: false,
         userMoved: false,
       };
 
@@ -280,7 +279,7 @@
       'position:fixed',
       'right:16px',
       'top:72px',
-      'width:440px',
+      'width:480px',
       'background:#fff',
       'border-radius:16px',
       'box-shadow:0 8px 48px rgba(0,0,0,0.22)',
@@ -311,6 +310,7 @@
   }
 
   function removeHighlight() {
+    if (highlightTimer) { clearTimeout(highlightTimer); highlightTimer = null; }
     if (calloutEl) { calloutEl.remove(); calloutEl = null; }
     if (highlightEl) { highlightEl.remove(); highlightEl = null; }
   }
@@ -427,7 +427,7 @@
     const vw = window.innerWidth;
     const vh = window.innerHeight;
     const widgetRect = trainingEl.getBoundingClientRect();
-    const ww = widgetRect.width || 440;
+    const ww = widgetRect.width || 480;
     const wh = widgetRect.height || 520;
     const gap = 24;
 
@@ -512,8 +512,10 @@
 
     el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
 
-    // Wait for scroll to settle before positioning the fixed overlays
-    setTimeout(() => {
+    // Wait for scroll to settle before positioning the fixed overlays.
+    // Use highlightTimer so a rapid step change cancels this before it fires.
+    highlightTimer = setTimeout(() => {
+      highlightTimer = null;
       if (!el) return;
       const rect = el.getBoundingClientRect();
       if (rect.width === 0 && rect.height === 0) return;
@@ -607,11 +609,11 @@
       if (m.role === 'assistant') {
         return `<div style="display:flex;gap:6px;align-items:flex-start;margin-bottom:8px">
           <div style="width:22px;height:22px;border-radius:50%;background:linear-gradient(135deg,#0EA5E9,#6366F1);color:#fff;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">S</div>
-          <div style="background:#F8FAFC;border:1px solid #E8ECF2;border-radius:12px 12px 12px 3px;padding:8px 10px;font-size:12px;line-height:1.55;max-width:215px;color:#1A1D26">${esc(m.content)}</div>
+          <div style="background:#F8FAFC;border:1px solid #E8ECF2;border-radius:12px 12px 12px 3px;padding:8px 10px;font-size:12px;line-height:1.55;max-width:260px;color:#1A1D26">${esc(m.content)}</div>
         </div>`;
       }
       return `<div style="display:flex;justify-content:flex-end;margin-bottom:8px">
-        <div style="background:#0EA5E9;color:#fff;border-radius:12px 12px 3px 12px;padding:8px 10px;font-size:12px;line-height:1.55;max-width:205px">${esc(m.content)}</div>
+        <div style="background:#0EA5E9;color:#fff;border-radius:12px 12px 3px 12px;padding:8px 10px;font-size:12px;line-height:1.55;max-width:250px">${esc(m.content)}</div>
       </div>`;
     }).join('');
 
@@ -668,13 +670,8 @@
       </div>
 
       <div style="padding:8px 12px;border-top:1px solid #E8ECF2;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:#fff">
-        ${training.pendingSkipConfirm ? `
-          <button id="__hp_retry__" style="padding:6px 14px;border-radius:7px;background:#F1F5F9;color:#4A5168;font-size:12px;font-weight:600;border:none">↩ Try again</button>
-          <button id="__hp_skip__" style="padding:6px 16px;border-radius:7px;background:#6366F1;color:#fff;font-size:12px;font-weight:600;border:none">Skip →</button>
-        ` : `
-          <button id="__hp_prev__" style="padding:6px 14px;border-radius:7px;background:#F1F5F9;color:#4A5168;font-size:12px;font-weight:600;border:none;opacity:${stepIndex === 0 ? '0.4' : '1'}">← Back</button>
-          <button id="__hp_next__" style="padding:6px 16px;border-radius:7px;background:#0EA5E9;color:#fff;font-size:12px;font-weight:600;border:none">${isLast ? 'Done ✓' : 'Got it →'}</button>
-        `}
+        <button id="__hp_prev__" style="padding:6px 14px;border-radius:7px;background:#F1F5F9;color:#4A5168;font-size:12px;font-weight:600;border:none;opacity:${stepIndex === 0 ? '0.4' : '1'}">← Back</button>
+        <button id="__hp_next__" style="padding:6px 16px;border-radius:7px;background:#0EA5E9;color:#fff;font-size:12px;font-weight:600;border:none">${isLast ? 'Done ✓' : 'Got it →'}</button>
       </div>
       `}
     `;
@@ -697,25 +694,18 @@
     });
 
     if (!minimized) {
-      if (training.pendingSkipConfirm) {
-        // Try again: clear the flag, stay on step, re-render
-        trainingEl.querySelector('#__hp_retry__').addEventListener('click', () => {
-          training.pendingSkipConfirm = false;
-          renderWidget(); scrollChat();
-        });
-        // Skip: advance past the unverified step
-        trainingEl.querySelector('#__hp_skip__').addEventListener('click', () => {
-          training.pendingSkipConfirm = false;
-          doAdvance();
-        });
-      } else {
+      {
         trainingEl.querySelector('#__hp_prev__').addEventListener('click', async () => {
           if (training.stepIndex > 0 && !training.isTyping) {
             training.stepIndex--;
             training.pendingSkipConfirm = false;
             highlightStep(training.steps[training.stepIndex]);
-            // Ask Sarah how to undo / what to do at the previous step
-            const userMsg = 'I want to go back and redo the previous step.';
+            // Ask Sarah how to undo / what to do at the previous step.
+            // Include the step URL so she can tell the user which page to navigate to.
+            const prevStep = training.steps[training.stepIndex];
+            const prevUrl = prevStep?.url || '';
+            const urlHint = prevUrl ? ` The step is on this page: ${prevUrl}.` : '';
+            const userMsg = `I want to go back and redo the previous step.${urlHint} If it is on a different page, please tell me exactly how to navigate there first.`;
             const updatedHistory = [...training.chatHistory, { role: 'user', content: userMsg }];
             training.chatHistory = updatedHistory;
             training.isTyping = true;
@@ -724,8 +714,11 @@
               const { reply } = await callSarahPlay(updatedHistory, 'chat');
               training.isTyping = false;
               if (!trainingEl) return;
-              const prevInstruction = stripHtml(training.steps[training.stepIndex]?.instruction || '');
-              const msg = reply || `Of course! Let's go back. Here's what to do: ${prevInstruction}`;
+              const prevInstruction = stripHtml(prevStep?.instruction || '');
+              const fallback = prevUrl
+                ? `Of course! Navigate to ${prevUrl} first, then: ${prevInstruction}`
+                : `Of course! Here's what to do: ${prevInstruction}`;
+              const msg = reply || fallback;
               training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
             } catch { training.isTyping = false; }
             renderWidget(); scrollChat();
@@ -971,10 +964,9 @@
     renderWidget(); scrollChat();
   }
 
-  // "Got it →": take a quick screenshot and ask Sarah if the step looks done.
-  // If yes → advance. If no → show "Try again / Skip" options.
-  // User is never blocked: Skip always works.
-  async function handleNext() {
+  // "Got it →": trust the user and advance immediately.
+  // Auto-observe (URL polling) handles smart detection; "Got it" is the manual override.
+  function handleNext() {
     if (!trainingEl || training.isTyping) return;
     const { steps, stepIndex } = training;
     const isLast = stepIndex + 1 >= steps.length;
@@ -987,39 +979,7 @@
     }
 
     cancelAutoObserve();
-    training.pendingSkipConfirm = false;
-    training.isTyping = true;
-    renderWidget(); scrollChat();
-
-    try {
-      const { reply, detectedStep } = await callSarahPlay(training.chatHistory, 'observe');
-      training.isTyping = false;
-      if (!trainingEl) return;
-
-      if (detectedStep > training.stepIndex) {
-        // Sarah confirms it's done — advance
-        training.stepIndex = detectedStep;
-        lastAdvancementTime = Date.now();
-        highlightStep(steps[training.stepIndex]);
-        const nextInstruction = stripHtml(steps[training.stepIndex]?.instruction || '');
-        training.chatHistory = [...training.chatHistory, {
-          role: 'assistant',
-          content: `✓ Got it! Now: ${nextInstruction}`,
-        }];
-      } else {
-        // Sarah says not done yet — offer options, never block
-        const msg = "That doesn't look done yet 😊 Want to try again, or skip for now?";
-        training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
-        training.pendingSkipConfirm = true;
-      }
-    } catch {
-      // On error, advance anyway — never leave user stuck
-      training.isTyping = false;
-      doAdvance();
-      return;
-    }
-
-    renderWidget(); scrollChat();
+    doAdvance();
   }
 
   // ─── Draggable ──────────────────────────────────────────────────────────────
