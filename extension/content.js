@@ -660,7 +660,6 @@
 
       ${minimized ? '' : `
       <div style="background:#F8FAFC;border-bottom:1px solid #E8ECF2;flex-shrink:0">
-        ${step.screenshot ? `<div style="border-bottom:1px solid #E8ECF2;overflow:hidden;max-height:160px;cursor:pointer" id="__hp_ss__"><img src="${step.screenshot}" alt="Step ${stepIndex + 1}" style="width:100%;display:block;object-fit:cover;object-position:top"/></div>` : ''}
         <div style="padding:10px 12px;display:flex;align-items:flex-start;gap:8px">
           <div style="width:22px;height:22px;border-radius:50%;background:#0EA5E9;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${stepIndex + 1}</div>
           <div style="font-size:12px;font-weight:600;color:#1A1D26;line-height:1.55">${esc(stripHtml(step.instruction || 'Follow the step shown'))}</div>
@@ -739,14 +738,6 @@
         trainingEl.querySelector('#__hp_next__').addEventListener('click', () => handleNext());
       }
 
-      // Click screenshot to expand/collapse it
-      const ssEl = trainingEl.querySelector('#__hp_ss__');
-      if (ssEl) {
-        ssEl.addEventListener('click', () => {
-          const expanded = ssEl.style.maxHeight === 'none';
-          ssEl.style.maxHeight = expanded ? '160px' : 'none';
-        });
-      }
 
       trainingEl.querySelector('#__hp_snd__').addEventListener('click', () => sendChatMessage());
 
@@ -886,6 +877,7 @@
   function advanceToStep(targetStep) {
     if (!trainingEl) return;
     if (targetStep <= training.stepIndex || targetStep >= training.steps.length) return;
+    if (Date.now() - lastAdvancementTime < 1500) return; // prevent rapid-fire duplicates
     training.pendingSkipConfirm = false;
     training.stepIndex = targetStep - 1; // doAdvance will increment by 1
     doAdvance();
@@ -1003,8 +995,8 @@
     const instrHint  = stripHtml(steps[training.stepIndex]?.instruction || '');
     const phaseHint  = steps[training.stepIndex]?.phaseName ? ` We're in the "${steps[training.stepIndex].phaseName}" phase.` : '';
     const prompt = instrHint
-      ? `[Just moved to the next step.${phaseHint} The step is: "${instrHint}". In 1-2 warm sentences, explain WHY this step matters and what we're building — don't just repeat the instruction.]`
-      : `[Just moved to the next step.${phaseHint} Briefly tell me what to do here and why it matters.]`;
+      ? `[Next step.${phaseHint} Step: "${instrHint}". One warm sentence explaining WHY — no longer.]`
+      : `[Next step.${phaseHint} One sentence: what to do and why it matters.]`;
 
     const historyWithPrompt = [...training.chatHistory, { role: 'user', content: prompt }];
     callSarahPlay(historyWithPrompt, 'chat').then(({ reply }) => {

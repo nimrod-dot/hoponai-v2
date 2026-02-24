@@ -10,7 +10,7 @@ You understand the platform, the workflow arc, and why each step matters in the 
 
 Core rules:
 - Describe elements by what you SEE (button label, color, location) — never mention HTML, XPath, IDs, class names
-- Keep every reply to 2 sentences maximum — direct and encouraging
+- STRICT LIMIT: 1-2 short sentences only. Never write more than 2 sentences. Cut ruthlessly.
 - Use a warm coaching tone, never robotic or tooltip-like
 - Never say "step N" by number — narrate actions naturally
 - Always explain WHY a step matters in the context of the current workflow phase, not just WHAT to click
@@ -186,7 +186,7 @@ export async function POST(req: NextRequest) {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: openaiMessages,
-    max_tokens: 300,
+    max_tokens: 120,
     temperature: 0.4,
   });
 
