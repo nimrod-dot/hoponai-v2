@@ -59,26 +59,9 @@
     window.removeEventListener('beforeunload', onNavigate);
   }
 
-  function isInteractiveElement(el) {
-    const interactiveTags  = new Set(['button', 'a', 'input', 'select', 'textarea', 'label', 'summary']);
-    const interactiveRoles = new Set(['button','menuitem','option','tab','link','checkbox','radio','switch','combobox','menuitemcheckbox','menuitemradio','treeitem']);
-    let node = el;
-    for (let i = 0; i < 4 && node && node !== document.body; i++) {
-      const tag  = (node.tagName || '').toLowerCase();
-      const role = (node.getAttribute?.('role') || '').toLowerCase();
-      const ti   = node.getAttribute?.('tabindex');
-      if (interactiveTags.has(tag))  return true;
-      if (interactiveRoles.has(role)) return true;
-      if (ti !== null && ti !== '-1') return true;
-      node = node.parentElement;
-    }
-    return false;
-  }
-
   function onClickCapture(e) {
     const el = /** @type {Element} */ (e.target);
     if (el.closest && el.closest('#__hoponai_training__')) return;
-    if (!isInteractiveElement(el)) return;
     const step = buildStep('click', el, {
       x: /** @type {MouseEvent} */ (e).clientX,
       y: /** @type {MouseEvent} */ (e).clientY,
