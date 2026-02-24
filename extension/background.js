@@ -71,7 +71,7 @@ async function handleStepCaptured(step, tabId) {
   try {
     screenshot = await chrome.tabs.captureVisibleTab(null, {
       format: 'jpeg',
-      quality: 80,
+      quality: 40,
     });
   } catch {
     // Tab may not be visible — continue without screenshot
