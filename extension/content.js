@@ -878,6 +878,7 @@
     if (!trainingEl) return;
     if (targetStep <= training.stepIndex || targetStep >= training.steps.length) return;
     if (Date.now() - lastAdvancementTime < 1500) return; // prevent rapid-fire duplicates
+    if (training.isTyping || training.isObserving) return; // don't interrupt while Sarah is busy
     training.pendingSkipConfirm = false;
     training.stepIndex = targetStep - 1; // doAdvance will increment by 1
     doAdvance();
@@ -968,13 +969,27 @@
   // so she explains WHY the next step matters, not just WHAT to click.
   function doAdvance() {
     if (!trainingEl) return;
+    if (training.isTyping) return; // prevent concurrent calls while Sarah is responding
     const { steps, phases } = training;
     if (training.stepIndex + 1 >= steps.length) return;
 
-    const prevPhaseIndex = steps[training.stepIndex]?.phaseIndex ?? -1;
+    const prevInstruction = stripHtml(steps[training.stepIndex]?.instruction || '');
+    const prevPhaseIndex  = steps[training.stepIndex]?.phaseIndex ?? -1;
     training.stepIndex++;
     training.pendingSkipConfirm = false;
     lastAdvancementTime = Date.now();
+
+    // Auto-skip consecutive steps with the same instruction (e.g. click→input→change on same field
+    // all get the same AI instruction — no need to narrate "Enter project name" three times).
+    while (
+      training.stepIndex + 1 < steps.length &&
+      prevInstruction &&
+      stripHtml(steps[training.stepIndex]?.instruction || '') === prevInstruction
+    ) {
+      training.stepIndex++;
+      lastAdvancementTime = Date.now();
+    }
+
     highlightStep(steps[training.stepIndex]);
 
     const newPhaseIndex  = steps[training.stepIndex]?.phaseIndex ?? -1;
