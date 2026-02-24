@@ -172,6 +172,7 @@
   let onPageClickHandler = null;
   let observeDebounceTimer = null;
   let urlPollInterval = null;
+  let proactiveTimer = null;   // fires when user is idle on a step too long — sends a visual hint
   let lastAdvancementTime = 0; // cooldown: prevent re-observe right after step advances
   let highlightTimer = null;  // cancel pending spotlight creation on rapid step changes
 
@@ -190,6 +191,7 @@
     platformName: null,
     phases: null,              // workflow phases [{name, stepStart, stepEnd, transitionMessage, context}]
     lastUrlSig: '',            // urlSig of last polled URL — ignores query-param noise
+    hintGivenForStep: -1,      // step index for which a proactive hint was already sent (one per step)
   };
 
   // Entry point: fetch walkthrough data, then show widget
@@ -240,6 +242,7 @@
         coachingNotes:   result.metadata?.coachingNotes   ?? null,
         platformName:    result.metadata?.platformName    ?? null,
         phases:          result.metadata?.phases          ?? null,
+        hintGivenForStep: -1,
       };
 
       // Listen for page clicks — advance instantly when user clicks the target element
@@ -307,6 +310,7 @@
     removeHighlight();
     lastHighlightedStepIndex = -1;
     cancelAutoObserve();
+    cancelProactiveHint();
     stopUrlPolling();
     if (onPageClickHandler) {
       document.removeEventListener('click', onPageClickHandler, { capture: true });
@@ -836,6 +840,7 @@
         if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
         renderWidget();
         scrollChat();
+        scheduleProactiveHint(); // start idle timer for the new step
       }
       // No advancement → silent, don't re-render, don't touch chat
     } catch {
@@ -854,6 +859,49 @@
   function cancelAutoObserve() {
     clearTimeout(observeDebounceTimer);
     observeDebounceTimer = null;
+  }
+
+  // Proactive hint: if user is idle on a step for 25s, Sarah offers a visual hint.
+  // One hint per step max — resets when step advances.
+  function scheduleProactiveHint() {
+    clearTimeout(proactiveTimer);
+    proactiveTimer = null;
+    if (!trainingEl || training.minimized) return;
+    if (training.stepIndex + 1 >= training.steps.length) return; // last step — no hint needed
+    if (training.hintGivenForStep === training.stepIndex) return; // already hinted this step
+
+    proactiveTimer = setTimeout(async () => {
+      proactiveTimer = null;
+      if (!trainingEl || training.isTyping || training.isObserving || training.minimized) return;
+      if (training.hintGivenForStep === training.stepIndex) return;
+
+      const step = training.steps[training.stepIndex];
+      const instrHint = stripHtml(step?.instruction || '');
+      if (!instrHint) return;
+
+      training.hintGivenForStep = training.stepIndex;
+      training.isTyping = true;
+      renderWidget(); scrollChat();
+
+      const hintPrompt = `[HINT: user has been on step ${training.stepIndex + 1} for 25 seconds. Step: "${instrHint}". Give a visual hint — WHERE on screen to look, what the element looks like (color, position, label), or a common pitfall. 1-2 sentences, warm. Do NOT repeat the instruction verbatim.]`;
+      const recentHistory = training.chatHistory.slice(-4);
+      const historyWithHint = [...recentHistory, { role: 'user', content: hintPrompt }];
+
+      try {
+        const { reply } = await callSarahPlay(historyWithHint, 'chat');
+        training.isTyping = false;
+        if (!trainingEl) return;
+        if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
+      } catch {
+        training.isTyping = false;
+      }
+      renderWidget(); scrollChat();
+    }, 25000);
+  }
+
+  function cancelProactiveHint() {
+    clearTimeout(proactiveTimer);
+    proactiveTimer = null;
   }
 
   // Get a comparable signature from a URL: pathname + hash (covers SPA hash routing)
@@ -936,6 +984,7 @@
     }
     renderWidget();
     scrollChat();
+    scheduleProactiveHint(); // start 25s idle timer after greet — covers the very first step
   }
 
   async function sendChatMessage() {
@@ -944,6 +993,7 @@
     const text = input ? input.value.trim() : '';
     if (!text) return;
     input.value = '';
+    cancelProactiveHint(); // user is actively engaged — no need for idle hint
 
     const updatedHistory = [...training.chatHistory, { role: 'user', content: text }];
     training.chatHistory = updatedHistory;
@@ -970,6 +1020,7 @@
   function doAdvance() {
     if (!trainingEl) return;
     if (training.isTyping) return; // prevent concurrent calls while Sarah is responding
+    cancelProactiveHint(); // clear any pending idle hint for the step we're leaving
     const { steps, phases } = training;
     if (training.stepIndex + 1 >= steps.length) return;
 
@@ -1021,6 +1072,7 @@
       if (!trainingEl) return;
       if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
       renderWidget(); scrollChat();
+      scheduleProactiveHint(); // start 25s idle timer for the new step
     }).catch(() => { training.isTyping = false; renderWidget(); });
   }
 

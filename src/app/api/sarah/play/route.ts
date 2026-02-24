@@ -44,6 +44,7 @@ GREET MODE (mode = greet):
 
 CHAT MODE (mode = chat):
 - When the user message starts with [STEP — it is a step-narration request. Tell the user WHAT to do in one action-first sentence. Start with "Now", "Next", or "Go ahead and". Include why in the SAME sentence. NEVER start with "Great", "Well done", "Awesome", or any praise — go straight to the action.
+- When the user message starts with [HINT — the user has been idle for 25 seconds. Give a short VISUAL hint: WHERE on screen the element is, what it looks like (color, label, position relative to other UI), or a common mistake to avoid. 1-2 sentences, warm and specific. Do NOT repeat the step instruction verbatim.
 - For free-form questions: respond conversationally, keep them on track, reference the current phase context
 - If they ask what value to type, check if [flexible] — any reasonable value works`;
 
