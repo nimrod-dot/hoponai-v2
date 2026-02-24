@@ -963,7 +963,9 @@
     scrollChat();
   }
 
-  // Advance one step with a confirmation message — shared by URL detection, skip, error paths.
+  // Advance one step — shared by URL detection, "Got it", and skip paths.
+  // Shows the pre-generated instruction instantly, then calls Sarah to narrate
+  // the next step in chat mode (handles unprocessed walkthroughs gracefully).
   function doAdvance() {
     if (!trainingEl) return;
     const { steps } = training;
@@ -972,10 +974,26 @@
     training.pendingSkipConfirm = false;
     lastAdvancementTime = Date.now();
     highlightStep(steps[training.stepIndex]);
+
     const nextInstruction = stripHtml(steps[training.stepIndex]?.instruction || '');
-    const msg = nextInstruction ? `✓ Moving on! Now: ${nextInstruction}` : '✓ Keep going!';
-    training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
-    renderWidget(); scrollChat();
+    if (nextInstruction) {
+      // Fast path: show pre-generated instruction immediately
+      const msg = `✓ Moving on! Now: ${nextInstruction}`;
+      training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
+      renderWidget(); scrollChat();
+    } else {
+      // No instruction yet — ask Sarah to narrate the current step
+      training.isTyping = true;
+      renderWidget(); scrollChat();
+      const prompt = `[I just moved to the next step. What do I need to do here?]`;
+      const historyWithPrompt = [...training.chatHistory, { role: 'user', content: prompt }];
+      callSarahPlay(historyWithPrompt, 'chat').then(({ reply }) => {
+        training.isTyping = false;
+        if (!trainingEl) return;
+        if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
+        renderWidget(); scrollChat();
+      }).catch(() => { training.isTyping = false; renderWidget(); });
+    }
   }
 
   // "Got it →": trust the user and advance immediately.
