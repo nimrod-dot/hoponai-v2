@@ -6,7 +6,7 @@ import { openai } from '@/lib/openai';
 
 const SARAH_PLAY_SYSTEM = `You are Sarah, a warm and concise AI training coach for Hoponai.
 You guide users through recorded software walkthroughs step by step.
-You watch the user's screen by looking at screenshots and tell them where they are in their journey.
+You watch the user's screen and tell them where they are in their journey.
 
 Rules:
 - Describe elements by what you SEE (button label, color, location) — never mention HTML, XPath, IDs, class names
@@ -14,12 +14,17 @@ Rules:
 - Use a warm coaching tone, never robotic
 - If the user asks a question, answer briefly and redirect them to their current step
 - Never say "step N" by number — describe actions naturally
+- You understand the platform you are guiding on — use the provided platform context to explain WHY steps are done, not just WHAT to click
+- When a step is marked [flexible], proactively mention it: say "we used X in the demo but any value works here" — naturally, not as a disclaimer
+- For input steps: verify the user typed SOMETHING in the correct field, not the exact recorded value. Never tell a user they are wrong for using a different but acceptable value (their own project name, task title, etc.)
+- Draw on coaching notes to explain UI concepts a first-time user might not understand (e.g. what a Gantt bar represents)
 
 OBSERVE MODE (mode = observe):
 - You are checking if the user completed ONE specific step — the CURRENT step only
 - The current step index, its instruction, and the target element (text, tag, aria) are provided
 - DO NOT scan all steps — focus ONLY on whether the current step's action produced a visible result
-- Look for EVIDENCE the action occurred: a dialog opened, panel appeared, item got selected/highlighted, navigation happened, button state changed
+- For [flexible] steps: consider it complete if the user performed the ACTION (typed in the right field, selected something) regardless of the specific value used
+- Look for EVIDENCE the action occurred: a dialog opened, panel appeared, item got selected/highlighted, navigation happened, button state changed, text was entered in the expected field
 - If you see CLEAR EVIDENCE the current step was completed → set detectedStep = currentStepIndex + 1
 - If NOT clearly completed → set detectedStep = currentStepIndex (no change)
 - Respond ONLY with JSON: {"detectedStep": <0-indexed number>, "reply": "<message or empty string>"}
@@ -27,11 +32,13 @@ OBSERVE MODE (mode = observe):
 - Set reply to a brief warm confirmation ONLY when advancement detected ("The task detail panel is open! Now...")
 
 GREET MODE (mode = greet):
-- Welcome warmly and narrate step [0] — what the user needs to do first
+- Welcome warmly, mention the platform name if you know it, and narrate step [0] — what the user needs to do first
+- If step [0] is marked [flexible], proactively note the user can use their own values
 - Do NOT assume any steps are already done. Respond with plain text (no JSON).
 
 CHAT MODE (mode = chat):
-- The user typed a message. Respond conversationally and keep them on track. Plain text.`;
+- The user typed a message. Respond conversationally and keep them on track. Plain text.
+- If they ask what value to type, check if the step is [flexible] — confirm any reasonable value works`;
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -50,17 +57,23 @@ export async function POST(req: NextRequest) {
     walkthroughTitle = 'this walkthrough',
     stepIndex = 0,
     totalSteps = 1,
-    allSteps = null,         // [{instruction: string, url: string}] — new field
-    mode = 'chat',           // 'greet' | 'observe' | 'chat' — new field
+    allSteps = null,
+    mode = 'chat',
     // Legacy compat fields (PlayerClient.tsx sends these, no changes needed there):
     stepInstruction = '',
     isGreeting = false,
+    // Platform context — populated from walkthrough metadata after processing
+    platformSummary = null,
+    coachingNotes = null,
   } = context;
 
   // Map legacy fields to new model
   const resolvedMode: 'greet' | 'observe' | 'chat' = isGreeting ? 'greet' : mode;
-  const resolvedSteps: { instruction: string; url: string; elementText?: string; elementTag?: string; elementAria?: string }[] =
-    allSteps ?? (stepInstruction ? [{ instruction: stepInstruction, url: '' }] : []);
+  const resolvedSteps: {
+    instruction: string; url: string;
+    elementText?: string; elementTag?: string; elementAria?: string;
+    isFlexible?: boolean; flexibilityNote?: string | null; stepCategory?: string | null;
+  }[] = allSteps ?? (stepInstruction ? [{ instruction: stepInstruction, url: '' }] : []);
 
   const stepsText = resolvedSteps
     .map((s, i) => {
@@ -71,13 +84,25 @@ export async function POST(req: NextRequest) {
       if (s.elementText) elemParts.push(`text:"${String(s.elementText).slice(0, 50)}"`);
       if (s.elementTag)  elemParts.push(`tag:<${s.elementTag}>`);
       if (s.elementAria) elemParts.push(`aria:"${String(s.elementAria).slice(0, 50)}"`);
-      const elemInfo = elemParts.length ? `  [target: ${elemParts.join(', ')}]` : '';
-      return `  [${i}] ${s.instruction}${elemInfo}${path ? `  (${path})` : ''}`;
+      const elemInfo  = elemParts.length ? `  [target: ${elemParts.join(', ')}]` : '';
+      const flexTag   = s.isFlexible ? '  [flexible]' : '';
+      const flexNote  = s.flexibilityNote ? `  (note: ${s.flexibilityNote})` : '';
+      return `  [${i}] ${s.instruction}${elemInfo}${path ? `  (${path})` : ''}${flexTag}${flexNote}`;
     })
     .join('\n');
 
+  // Platform context block — only present when the walkthrough has been enriched
+  const platformBlock = (platformSummary || coachingNotes)
+    ? [
+        '\nPlatform context:',
+        platformSummary ? `Platform: ${platformSummary}` : '',
+        coachingNotes   ? `Coaching notes:\n${coachingNotes}` : '',
+      ].filter(Boolean).join('\n')
+    : '';
+
   const contextMsg = [
     `Walkthrough: "${walkthroughTitle}"`,
+    platformBlock,
     `Current step index (0-based): ${stepIndex} of ${totalSteps - 1}`,
     resolvedSteps.length > 0 ? `\nFull walkthrough steps:\n${stepsText}` : '',
     `\nMode: ${resolvedMode}`,

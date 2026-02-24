@@ -38,16 +38,25 @@ export async function GET(req: NextRequest) {
   const walkthroughId = req.nextUrl.searchParams.get('id');
 
   if (walkthroughId) {
-    // Full walkthrough including steps (for training widget)
+    // Full walkthrough including steps + platform metadata (for training widget)
     const { data: w } = await supabase
       .from('walkthroughs')
-      .select('id, title, description, steps, status')
+      .select('id, title, description, steps, status, metadata')
       .eq('id', walkthroughId)
       .eq('org_id', user.org_id)
       .eq('status', 'ready')
       .single();
     if (!w) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-    return NextResponse.json({ walkthrough: w });
+    return NextResponse.json({
+      walkthrough: {
+        ...w,
+        metadata: {
+          platform_summary: (w.metadata as any)?.platform_summary ?? null,
+          coaching_notes:   (w.metadata as any)?.coaching_notes   ?? null,
+          platform_name:    (w.metadata as any)?.platform_name    ?? null,
+        },
+      },
+    });
   }
 
   // List only (no step bodies)

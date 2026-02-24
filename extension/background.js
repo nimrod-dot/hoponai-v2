@@ -228,8 +228,18 @@ async function bgFetchWalkthrough(walkthroughId) {
     );
     if (!res.ok) return { ok: false, error: `HTTP ${res.status}` };
     const data = await res.json();
-    const steps = Array.isArray(data.walkthrough?.steps) ? data.walkthrough.steps : [];
-    return { ok: true, steps, title: data.walkthrough?.title || '' };
+    const wt = data.walkthrough;
+    const steps = Array.isArray(wt?.steps) ? wt.steps : [];
+    return {
+      ok: true,
+      steps,
+      title: wt?.title || '',
+      metadata: {
+        platformSummary: wt?.metadata?.platform_summary ?? null,
+        coachingNotes:   wt?.metadata?.coaching_notes   ?? null,
+        platformName:    wt?.metadata?.platform_name    ?? null,
+      },
+    };
   } catch (e) {
     return { ok: false, error: String(e) };
   }

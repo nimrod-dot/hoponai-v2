@@ -185,6 +185,9 @@
     isObserving: false,
     lastUrl: '',
     userMoved: false,          // true once user manually drags widget — disables auto-position
+    platformSummary: null,     // from walkthrough metadata (set during processing)
+    coachingNotes: null,
+    platformName: null,
   };
 
   // Entry point: fetch walkthrough data, then show widget
@@ -231,6 +234,9 @@
         isObserving: false,
         lastUrl: '',
         userMoved: false,
+        platformSummary: result.metadata?.platformSummary ?? null,
+        coachingNotes:   result.metadata?.coachingNotes   ?? null,
+        platformName:    result.metadata?.platformName    ?? null,
       };
 
       // Listen for page clicks — advance instantly when user clicks the target element
@@ -655,6 +661,8 @@
         <div style="padding:10px 12px;display:flex;align-items:flex-start;gap:8px">
           <div style="width:22px;height:22px;border-radius:50%;background:#0EA5E9;color:#fff;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px">${stepIndex + 1}</div>
           <div style="font-size:12px;font-weight:600;color:#1A1D26;line-height:1.55">${esc(stripHtml(step.instruction || 'Follow the step shown'))}</div>
+          ${step.isFlexible ? `<div style="margin-top:5px;display:inline-flex;align-items:center;background:#F0FDF4;border:1px solid #BBF7D0;border-radius:6px;padding:2px 7px;font-size:11px;font-weight:600;color:#15803D">Your choice</div>` : ''}
+          ${step.flexibilityNote ? `<div style="margin-top:4px;font-size:11px;color:#6B7280;line-height:1.4">${esc(step.flexibilityNote)}</div>` : ''}
         </div>
       </div>
 
@@ -759,11 +767,14 @@
     const { steps, stepIndex, title } = training;
     // Include element metadata — Sarah uses text/tag/aria as evidence of click completion
     const allSteps = steps.map((s) => ({
-      instruction: s.instruction || '',
-      url: s.url || '',
-      elementText: (s.element?.text || '').slice(0, 60),
-      elementTag: s.element?.tag || '',
-      elementAria: s.element?.aria_label || '',
+      instruction:     s.instruction || '',
+      url:             s.url || '',
+      elementText:     (s.element?.text || '').slice(0, 60),
+      elementTag:      s.element?.tag || '',
+      elementAria:     s.element?.aria_label || '',
+      isFlexible:      s.isFlexible === true,
+      flexibilityNote: s.flexibilityNote ?? null,
+      stepCategory:    s.stepCategory || null,
     }));
 
     let messages;
@@ -795,6 +806,8 @@
         totalSteps: steps.length,
         allSteps,
         mode,
+        platformSummary: training.platformSummary,
+        coachingNotes:   training.coachingNotes,
       },
     });
 
