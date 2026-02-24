@@ -189,6 +189,7 @@
     coachingNotes: null,
     platformName: null,
     phases: null,              // workflow phases [{name, stepStart, stepEnd, transitionMessage, context}]
+    lastUrlSig: '',            // urlSig of last polled URL — ignores query-param noise
   };
 
   // Entry point: fetch walkthrough data, then show widget
@@ -892,11 +893,15 @@
 
   function startUrlPolling() {
     training.lastUrl = window.location.href;
+    training.lastUrlSig = urlSig(window.location.href);
     urlPollInterval = setInterval(() => {
       if (!trainingEl) { clearInterval(urlPollInterval); return; }
       const current = window.location.href;
-      if (current !== training.lastUrl) {
+      const currentSig = urlSig(current);
+      // Compare path+hash only — ignore query-param changes (SPAs add/change params frequently)
+      if (currentSig !== training.lastUrlSig) {
         training.lastUrl = current;
+        training.lastUrlSig = currentSig;
         cancelAutoObserve();
         // First try URL-based step matching — instant, no AI needed
         const matched = matchStepByUrl(current);
@@ -967,6 +972,8 @@
   }
 
   // Advance one step — shared by URL detection, "Got it", and skip paths.
+  // Always calls Sarah for a narrative response (using phase + step context),
+  // so she explains WHY the next step matters, not just WHAT to click.
   function doAdvance() {
     if (!trainingEl) return;
     const { steps, phases } = training;
@@ -978,36 +985,34 @@
     lastAdvancementTime = Date.now();
     highlightStep(steps[training.stepIndex]);
 
-    const newPhaseIndex = steps[training.stepIndex]?.phaseIndex ?? -1;
+    const newPhaseIndex  = steps[training.stepIndex]?.phaseIndex ?? -1;
     const isPhaseTransition = newPhaseIndex > prevPhaseIndex && newPhaseIndex >= 0;
 
-    // Phase transition: show the pre-generated transition message from processing
+    // Phase transition: show the pre-generated transition message, then let Sarah add the first step
     if (isPhaseTransition && phases && phases[newPhaseIndex]?.transitionMessage) {
       const msg = phases[newPhaseIndex].transitionMessage;
       training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
       renderWidget(); scrollChat();
-      return;
+      // Don't return — fall through to also get Sarah to narrate the first step of the new phase
     }
 
-    const nextInstruction = stripHtml(steps[training.stepIndex]?.instruction || '');
-    if (nextInstruction) {
-      // Fast path: show pre-generated instruction immediately
-      const msg = `✓ Moving on! Now: ${nextInstruction}`;
-      training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
+    // Ask Sarah to narrate the current step with context — never just repeat the instruction
+    training.isTyping = true;
+    renderWidget(); scrollChat();
+
+    const instrHint  = stripHtml(steps[training.stepIndex]?.instruction || '');
+    const phaseHint  = steps[training.stepIndex]?.phaseName ? ` We're in the "${steps[training.stepIndex].phaseName}" phase.` : '';
+    const prompt = instrHint
+      ? `[Just moved to the next step.${phaseHint} The step is: "${instrHint}". In 1-2 warm sentences, explain WHY this step matters and what we're building — don't just repeat the instruction.]`
+      : `[Just moved to the next step.${phaseHint} Briefly tell me what to do here and why it matters.]`;
+
+    const historyWithPrompt = [...training.chatHistory, { role: 'user', content: prompt }];
+    callSarahPlay(historyWithPrompt, 'chat').then(({ reply }) => {
+      training.isTyping = false;
+      if (!trainingEl) return;
+      if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
       renderWidget(); scrollChat();
-    } else {
-      // No instruction yet — ask Sarah to narrate the current step
-      training.isTyping = true;
-      renderWidget(); scrollChat();
-      const prompt = `[I just moved to the next step. What do I need to do here?]`;
-      const historyWithPrompt = [...training.chatHistory, { role: 'user', content: prompt }];
-      callSarahPlay(historyWithPrompt, 'chat').then(({ reply }) => {
-        training.isTyping = false;
-        if (!trainingEl) return;
-        if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
-        renderWidget(); scrollChat();
-      }).catch(() => { training.isTyping = false; renderWidget(); });
-    }
+    }).catch(() => { training.isTyping = false; renderWidget(); });
   }
 
   // "Got it →": trust the user and advance immediately.
