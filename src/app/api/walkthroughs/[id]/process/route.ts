@@ -84,6 +84,13 @@ async function analyzeWalkthrough(
   platform_summary: string | null;
   coaching_notes: string | null;
   step_corrections: { index: number; isFlexible: boolean; flexibilityNote: string | null }[];
+  workflow_phases: {
+    name: string;
+    stepStart: number;
+    stepEnd: number;
+    transitionMessage: string;
+    context: string;
+  }[] | null;
 }> {
   const stepLines = steps
     .map((s, i) => `[${i}] type:${s.type} cat:${s.stepCategory} instruction:"${s.instruction}"`)
@@ -109,12 +116,21 @@ Return ONLY valid JSON (no markdown):
   "coaching_notes": "<2-5 coaching tips for Sarah about this platform's UI, each on its own line. E.g. 'In GanttPro, colored horizontal bars in the timeline represent tasks — their length shows duration.'>",
   "step_corrections": [
     { "index": <0-based step index>, "isFlexible": <bool>, "flexibilityNote": <string or null> }
+  ],
+  "workflow_phases": [
+    {
+      "name": "<short phase name, e.g. 'Create project', 'Add tasks', 'Set budget', 'Assign resources'>",
+      "stepStart": <0-based start index>,
+      "stepEnd": <0-based end index, inclusive>,
+      "transitionMessage": "<What Sarah says when the user ENTERS this phase (empty string for phase 0 — Sarah greets instead). Reference what was just accomplished and explain what this phase is about. Warm and narrative, 1-2 sentences. E.g. 'The project is set up! Now we will add tasks to it — each task you create will appear in the panel on the left.'>",
+      "context": "<1 sentence describing what exists at the START of this phase, e.g. 'The project has been created and we are now inside it adding content.'>"
+    }
   ]
 }
-If no corrections needed, return step_corrections: [].`,
+Group steps into 2-5 logical phases representing major workflow milestones. If no corrections needed, return step_corrections: [].`,
       },
     ],
-    max_tokens: 600,
+    max_tokens: 1000,
     temperature: 0.3,
   });
 
@@ -126,6 +142,7 @@ If no corrections needed, return step_corrections: [].`,
     platform_summary: parsed.platform_summary ? String(parsed.platform_summary) : null,
     coaching_notes:   parsed.coaching_notes   ? String(parsed.coaching_notes)   : null,
     step_corrections: Array.isArray(parsed.step_corrections) ? parsed.step_corrections : [],
+    workflow_phases:  Array.isArray(parsed.workflow_phases)  ? parsed.workflow_phases  : null,
   };
 }
 
@@ -224,11 +241,23 @@ export async function POST(
       }
     }
 
+    // Tag each step with its workflow phase
+    if (analysis.workflow_phases) {
+      for (let i = 0; i < enrichedSteps.length; i++) {
+        const phase = analysis.workflow_phases.find(p => i >= p.stepStart && i <= p.stepEnd);
+        if (phase) {
+          const phaseIndex = analysis.workflow_phases.indexOf(phase);
+          enrichedSteps[i] = { ...enrichedSteps[i], phaseIndex, phaseName: phase.name };
+        }
+      }
+    }
+
     updatedMetadata = {
       ...updatedMetadata,
       platform_name:    analysis.platform_name,
       platform_summary: analysis.platform_summary,
       coaching_notes:   analysis.coaching_notes,
+      phases:           analysis.workflow_phases ?? null,
     };
   } catch (err) {
     console.error('Holistic walkthrough analysis failed:', err);

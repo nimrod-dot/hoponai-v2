@@ -265,6 +265,7 @@ async function bgFetchWalkthrough(walkthroughId) {
         platformSummary: wt?.metadata?.platform_summary ?? null,
         coachingNotes:   wt?.metadata?.coaching_notes   ?? null,
         platformName:    wt?.metadata?.platform_name    ?? null,
+        phases:          wt?.metadata?.phases           ?? null,
       },
     };
   } catch (e) {

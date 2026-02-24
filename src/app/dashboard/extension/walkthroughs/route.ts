@@ -54,6 +54,7 @@ export async function GET(req: NextRequest) {
           platform_summary: (w.metadata as any)?.platform_summary ?? null,
           coaching_notes:   (w.metadata as any)?.coaching_notes   ?? null,
           platform_name:    (w.metadata as any)?.platform_name    ?? null,
+          phases:           (w.metadata as any)?.phases           ?? null,
         },
       },
     });

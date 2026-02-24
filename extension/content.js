@@ -188,6 +188,7 @@
     platformSummary: null,     // from walkthrough metadata (set during processing)
     coachingNotes: null,
     platformName: null,
+    phases: null,              // workflow phases [{name, stepStart, stepEnd, transitionMessage, context}]
   };
 
   // Entry point: fetch walkthrough data, then show widget
@@ -237,6 +238,7 @@
         platformSummary: result.metadata?.platformSummary ?? null,
         coachingNotes:   result.metadata?.coachingNotes   ?? null,
         platformName:    result.metadata?.platformName    ?? null,
+        phases:          result.metadata?.phases          ?? null,
       };
 
       // Listen for page clicks — advance instantly when user clicks the target element
@@ -808,6 +810,7 @@
         mode,
         platformSummary: training.platformSummary,
         coachingNotes:   training.coachingNotes,
+        phases:          training.phases,
         currentUrl: mode === 'greet' ? window.location.href : undefined,
       },
     });
@@ -964,16 +967,27 @@
   }
 
   // Advance one step — shared by URL detection, "Got it", and skip paths.
-  // Shows the pre-generated instruction instantly, then calls Sarah to narrate
-  // the next step in chat mode (handles unprocessed walkthroughs gracefully).
   function doAdvance() {
     if (!trainingEl) return;
-    const { steps } = training;
+    const { steps, phases } = training;
     if (training.stepIndex + 1 >= steps.length) return;
+
+    const prevPhaseIndex = steps[training.stepIndex]?.phaseIndex ?? -1;
     training.stepIndex++;
     training.pendingSkipConfirm = false;
     lastAdvancementTime = Date.now();
     highlightStep(steps[training.stepIndex]);
+
+    const newPhaseIndex = steps[training.stepIndex]?.phaseIndex ?? -1;
+    const isPhaseTransition = newPhaseIndex > prevPhaseIndex && newPhaseIndex >= 0;
+
+    // Phase transition: show the pre-generated transition message from processing
+    if (isPhaseTransition && phases && phases[newPhaseIndex]?.transitionMessage) {
+      const msg = phases[newPhaseIndex].transitionMessage;
+      training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
+      renderWidget(); scrollChat();
+      return;
+    }
 
     const nextInstruction = stripHtml(steps[training.stepIndex]?.instruction || '');
     if (nextInstruction) {
