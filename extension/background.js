@@ -65,14 +65,41 @@ async function handleStartRecording(tabId) {
   return { ok: true };
 }
 
+// Resize a captured screenshot data URL to maxWidth and re-encode as JPEG.
+// Uses OffscreenCanvas — available in extension service workers (Chrome 79+).
+async function resizeScreenshot(dataUrl, maxWidth = 1280) {
+  try {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    const bitmap = await createImageBitmap(blob);
+    const scale = Math.min(1, maxWidth / bitmap.width);
+    const w = Math.floor(bitmap.width  * scale);
+    const h = Math.floor(bitmap.height * scale);
+    const canvas = new OffscreenCanvas(w, h);
+    canvas.getContext('2d').drawImage(bitmap, 0, 0, w, h);
+    const resized = await canvas.convertToBlob({ type: 'image/jpeg', quality: 0.35 });
+    const buf = await resized.arrayBuffer();
+    const bytes = new Uint8Array(buf);
+    // Convert to base64 in chunks to avoid stack overflow on large arrays
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 8192) {
+      binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    }
+    return `data:image/jpeg;base64,${btoa(binary)}`;
+  } catch {
+    return dataUrl; // fallback: return original if resize fails
+  }
+}
+
 async function handleStepCaptured(step, tabId) {
   // Take a screenshot from the background (content scripts cannot do this)
   let screenshot = null;
   try {
-    screenshot = await chrome.tabs.captureVisibleTab(null, {
+    const raw = await chrome.tabs.captureVisibleTab(null, {
       format: 'jpeg',
-      quality: 40,
+      quality: 80,
     });
+    screenshot = await resizeScreenshot(raw, 1280);
   } catch {
     // Tab may not be visible — continue without screenshot
   }
