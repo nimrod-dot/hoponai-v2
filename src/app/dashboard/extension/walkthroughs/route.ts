@@ -3,9 +3,6 @@ import { createServerClient } from '@/lib/supabase';
 import { verifyExtensionToken, extractBearerToken } from '@/lib/extension-token';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Walkthroughs include base64 screenshots — allow up to 25 MB
-export const maxRequestBodySize = '25mb';
-
 // ── Helper: resolve DB user from Bearer token or Clerk cookie ──────────────────
 async function resolveUser(req: NextRequest) {
   const supabase = createServerClient();
