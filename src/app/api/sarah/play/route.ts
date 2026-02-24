@@ -35,6 +35,7 @@ GREET MODE (mode = greet):
 - Welcome warmly, mention the platform name if you know it, and narrate step [0] — what the user needs to do first
 - If step [0] is marked [flexible], proactively note the user can use their own values
 - Do NOT assume any steps are already done. Respond with plain text (no JSON).
+- If a "Page mismatch" note is present in the context: acknowledge where the user actually is (look at the screenshot), help them complete any prerequisites (login, signup, navigation) first, then explain how to reach the walkthrough's starting point. Do NOT jump to step [0] until they're on the right page.
 
 CHAT MODE (mode = chat):
 - The user typed a message. Respond conversationally and keep them on track. Plain text.
@@ -65,6 +66,8 @@ export async function POST(req: NextRequest) {
     // Platform context — populated from walkthrough metadata after processing
     platformSummary = null,
     coachingNotes = null,
+    // Page context — sent in greet mode to detect wrong starting page
+    currentUrl = null,
   } = context;
 
   // Map legacy fields to new model
@@ -108,6 +111,17 @@ export async function POST(req: NextRequest) {
     `\nMode: ${resolvedMode}`,
     resolvedMode === 'observe' ? `TASK: Determine if step [${stepIndex}] is completed. Look for evidence the action occurred. Return detectedStep = ${stepIndex + 1} if DONE, ${stepIndex} if NOT DONE.` : '',
     resolvedMode === 'greet'   ? 'This is the very start. Greet warmly and narrate step [0].' : '',
+    resolvedMode === 'greet' && currentUrl && resolvedSteps[0]?.url
+      ? (() => {
+          try {
+            const expected = new URL(resolvedSteps[0].url).pathname;
+            const current  = new URL(currentUrl as string).pathname;
+            if (expected !== current)
+              return `Page mismatch: User is on "${current}", but step [0] starts at "${expected}". Help the user navigate to the correct starting page, or complete any required prerequisites (login, account creation, etc.) first. Look at the screenshot to understand the current page.`;
+          } catch { /* ignore malformed URLs */ }
+          return '';
+        })()
+      : '',
     resolvedMode === 'chat'    ? `User is working on step [${stepIndex}]. Respond conversationally.` : '',
     stepIndex + 1 >= totalSteps ? 'This is the FINAL step — congratulate when done.' : '',
   ].filter(Boolean).join('\n');
@@ -134,8 +148,8 @@ export async function POST(req: NextRequest) {
     return [...textMsgs.slice(0, -1), visionMsg];
   };
 
-  // Only attach screenshot in observe mode
-  const imgToAttach = resolvedMode === 'observe' ? screenshot : null;
+  // Attach screenshot in observe mode (step verification) and greet mode (page awareness)
+  const imgToAttach = (resolvedMode === 'observe' || resolvedMode === 'greet') ? screenshot : null;
 
   const openaiMessages = [
     { role: 'system' as const, content: SARAH_PLAY_SYSTEM },

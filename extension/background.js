@@ -249,15 +249,15 @@ async function bgCallSarahPlay(messages, context, tabId) {
   const stored = await chrome.storage.local.get('extension_token');
   const token = stored.extension_token || null;
 
-  // Capture screenshot only for 'observe' mode — greet and chat don't need it.
+  // Capture screenshot for observe mode (step verification) and greet mode (page awareness).
   let screenshot = null;
-  if (context.mode === 'observe') {
+  if (context.mode === 'observe' || context.mode === 'greet') {
     try {
       if (tabId) {
         const tab = await chrome.tabs.get(tabId);
         screenshot = await chrome.tabs.captureVisibleTab(tab.windowId, {
           format: 'jpeg',
-          quality: 70,
+          quality: context.mode === 'greet' ? 40 : 70,
         });
       }
     } catch {

@@ -3,6 +3,7 @@ import { createServerClient } from '@/lib/supabase';
 import { notFound } from 'next/navigation';
 import ProcessButton from './ProcessButton';
 import ShareButton from './ShareButton';
+import StepList from './StepList';
 
 export default async function WalkthroughDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -70,66 +71,7 @@ export default async function WalkthroughDetailPage({ params }: { params: Promis
       </div>
 
       {/* Steps */}
-      {steps.length === 0 ? (
-        <div style={{ background: '#fff', borderRadius: 12, border: '1px solid #E8ECF2', padding: '48px 32px', textAlign: 'center' }}>
-          <div style={{ fontSize: 32, marginBottom: 12 }}>📭</div>
-          <p style={{ color: '#8B92A5' }}>No steps were recorded for this walkthrough.</p>
-        </div>
-      ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {steps.map((step: any, i: number) => (
-            <div key={i} style={{ background: '#fff', borderRadius: 12, border: '1px solid #E8ECF2', overflow: 'hidden' }}>
-              {/* Step header */}
-              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, padding: '16px 20px', borderBottom: step.screenshot ? '1px solid #E8ECF2' : 'none' }}>
-                <div style={{
-                  width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                  background: '#0EA5E9', color: '#fff',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 700, marginTop: 2,
-                }}>
-                  {i + 1}
-                </div>
-                <div style={{ flex: 1 }}>
-                  {/* AI instruction — shown when processed */}
-                  {step.instruction ? (
-                    <div style={{ fontSize: 15, fontWeight: 600, color: '#1A1D26', marginBottom: 4, lineHeight: 1.5 }}>
-                      {step.instruction}
-                    </div>
-                  ) : (
-                    <div style={{ fontSize: 14, fontWeight: 600, color: '#1A1D26', textTransform: 'capitalize', marginBottom: 2 }}>
-                      {step.type || 'action'}
-                      {step.element?.text && <span style={{ fontWeight: 400, color: '#4A5168' }}> — {step.element.text.slice(0, 60)}</span>}
-                    </div>
-                  )}
-                  <div style={{ fontSize: 12, color: '#8B92A5', display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                    {step.url && <span>{new URL(step.url).pathname}</span>}
-                    {step.elapsed_ms != null && <span>{(step.elapsed_ms / 1000).toFixed(1)}s</span>}
-                    <span style={{
-                      fontWeight: 600, padding: '0px 6px', borderRadius: 6,
-                      background: step.type === 'click' ? '#EFF6FF' : step.type === 'input' ? '#F0FDF4' : '#F9FAFB',
-                      color: step.type === 'click' ? '#1D4ED8' : step.type === 'input' ? '#16A34A' : '#6B7280',
-                    }}>
-                      {step.type}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Screenshot */}
-              {step.screenshot && (
-                <div style={{ background: '#F8FAFC', padding: 16 }}>
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={step.screenshot}
-                    alt={`Step ${i + 1}`}
-                    style={{ width: '100%', borderRadius: 8, border: '1px solid #E8ECF2', display: 'block' }}
-                  />
-                </div>
-              )}
-            </div>
-          ))}
-        </div>
-      )}
+      <StepList walkthroughId={id} steps={steps} />
     </div>
   );
 }
