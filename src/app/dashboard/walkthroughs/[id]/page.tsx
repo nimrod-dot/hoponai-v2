@@ -64,7 +64,7 @@ export default async function WalkthroughDetailPage({ params }: { params: Promis
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
             {isProcessed && <ShareButton walkthroughId={id} />}
-            {!isProcessed && <ProcessButton walkthroughId={id} />}
+            <ProcessButton walkthroughId={id} reprocess={isProcessed} />
           </div>
         </div>
       </div>

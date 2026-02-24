@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
-export default function ProcessButton({ walkthroughId }: { walkthroughId: string }) {
+export default function ProcessButton({ walkthroughId, reprocess = false }: { walkthroughId: string; reprocess?: boolean }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const router = useRouter();
@@ -32,8 +32,8 @@ export default function ProcessButton({ walkthroughId }: { walkthroughId: string
         onClick={handleProcess}
         disabled={loading}
         style={{
-          background: loading ? '#E8ECF2' : '#0EA5E9',
-          color: loading ? '#8B92A5' : '#fff',
+          background: loading ? '#E8ECF2' : reprocess ? '#F1F5F9' : '#0EA5E9',
+          color: loading ? '#8B92A5' : reprocess ? '#4A5168' : '#fff',
           border: 'none', borderRadius: 8,
           padding: '10px 20px', fontSize: 14, fontWeight: 600,
           cursor: loading ? 'wait' : 'pointer',
@@ -45,7 +45,7 @@ export default function ProcessButton({ walkthroughId }: { walkthroughId: string
             <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid #8B92A5', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 0.7s linear infinite' }} />
             Processing…
           </>
-        ) : '✨ Process with AI'}
+        ) : reprocess ? '↻ Re-process with AI' : '✨ Process with AI'}
       </button>
       {loading && (
         <p style={{ fontSize: 13, color: '#8B92A5', marginTop: 8 }}>
