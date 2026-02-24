@@ -43,6 +43,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     case 'CALL_SARAH_PLAY':
       bgCallSarahPlay(message.messages, message.context, sender.tab?.id).then(sendResponse);
       return true;
+
+    case 'LOG_TRAINING_EVENT':
+      bgLogTrainingEvent(message.walkthroughId, message.eventType, message.stepIndex ?? null).then(sendResponse);
+      return true;
   }
 });
 
@@ -270,6 +274,26 @@ async function bgFetchWalkthrough(walkthroughId) {
     };
   } catch (e) {
     return { ok: false, error: String(e) };
+  }
+}
+
+// Fire-and-forget analytics event logger — never blocks training flow.
+async function bgLogTrainingEvent(walkthroughId, eventType, stepIndex) {
+  const stored = await chrome.storage.local.get('extension_token');
+  const token = stored.extension_token || null;
+  if (!token) return { ok: false };
+  try {
+    await fetch(`${APP_URL}/api/analytics/event`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ walkthroughId, eventType, stepIndex }),
+    });
+    return { ok: true };
+  } catch {
+    return { ok: false };
   }
 }
 

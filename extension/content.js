@@ -192,6 +192,7 @@
     phases: null,              // workflow phases [{name, stepStart, stepEnd, transitionMessage, context}]
     lastUrlSig: '',            // urlSig of last polled URL — ignores query-param noise
     hintGivenForStep: -1,      // step index for which a proactive hint was already sent (one per step)
+    walkthroughId: null,       // UUID of the current walkthrough — used for analytics events
   };
 
   // Entry point: fetch walkthrough data, then show widget
@@ -243,6 +244,7 @@
         platformName:    result.metadata?.platformName    ?? null,
         phases:          result.metadata?.phases          ?? null,
         hintGivenForStep: -1,
+        walkthroughId,
       };
 
       // Listen for page clicks — advance instantly when user clicks the target element
@@ -267,6 +269,7 @@
       makeDraggable();
       highlightStep(steps[0]);
       startUrlPolling();
+      logEvent('session_start');
       sarahNarrate();
 
     } catch (err) {
@@ -880,6 +883,7 @@
       if (!instrHint) return;
 
       training.hintGivenForStep = training.stepIndex;
+      logEvent('hint_shown', training.stepIndex);
       training.isTyping = true;
       renderWidget(); scrollChat();
 
@@ -902,6 +906,17 @@
   function cancelProactiveHint() {
     clearTimeout(proactiveTimer);
     proactiveTimer = null;
+  }
+
+  // Fire-and-forget analytics event — never blocks or delays the training flow.
+  function logEvent(eventType, stepIndex = null) {
+    if (!training.walkthroughId) return;
+    chrome.runtime.sendMessage({
+      type: 'LOG_TRAINING_EVENT',
+      walkthroughId: training.walkthroughId,
+      eventType,
+      stepIndex,
+    }).catch(() => {});
   }
 
   // Get a comparable signature from a URL: pathname + hash (covers SPA hash routing)
@@ -994,6 +1009,7 @@
     if (!text) return;
     input.value = '';
     cancelProactiveHint(); // user is actively engaged — no need for idle hint
+    logEvent('question_asked', training.stepIndex);
 
     const updatedHistory = [...training.chatHistory, { role: 'user', content: text }];
     training.chatHistory = updatedHistory;
@@ -1042,6 +1058,7 @@
     }
 
     highlightStep(steps[training.stepIndex]);
+    logEvent('step_advance', training.stepIndex);
 
     const newPhaseIndex  = steps[training.stepIndex]?.phaseIndex ?? -1;
     const isPhaseTransition = newPhaseIndex > prevPhaseIndex && newPhaseIndex >= 0;
@@ -1084,6 +1101,7 @@
     const isLast = stepIndex + 1 >= steps.length;
 
     if (isLast) {
+      logEvent('session_complete');
       const msg = "🎉 You've completed all the steps! Great work!";
       training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
       renderWidget(); scrollChat();
