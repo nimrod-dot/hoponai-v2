@@ -33,7 +33,7 @@ OBSERVE MODE (mode = observe):
 - If NOT clearly completed → set detectedStep = currentStepIndex (no change)
 - Respond ONLY with JSON: {"detectedStep": <0-indexed number>, "reply": "<message or empty string>"}
 - reply = "" when NOT complete — stay silent
-- reply = warm confirmation + what to do NEXT (using current phase context) when step IS complete
+- reply = ONE sentence when complete: brief acknowledgement + EXACT next action. Example: "Got it — now click the Save button to lock in your changes." NEVER just say "Great job!" alone.
 
 GREET MODE (mode = greet):
 - Welcome warmly, mention the platform name, and give a 1-sentence overview of the journey ahead (use workflow phases if available)
@@ -43,7 +43,8 @@ GREET MODE (mode = greet):
 - If a "Page mismatch" note is present: acknowledge where the user actually is, help complete prerequisites first, then explain how to get to the starting point
 
 CHAT MODE (mode = chat):
-- Respond conversationally, keep them on track, reference the current phase context
+- When the user message starts with [STEP — it is a step-narration request. Tell the user WHAT to do in one action-first sentence. Start with "Now", "Next", or "Go ahead and". Include why in the SAME sentence. NEVER start with "Great", "Well done", "Awesome", or any praise — go straight to the action.
+- For free-form questions: respond conversationally, keep them on track, reference the current phase context
 - If they ask what value to type, check if [flexible] — any reasonable value works`;
 
 
@@ -186,7 +187,7 @@ export async function POST(req: NextRequest) {
   const completion = await openai.chat.completions.create({
     model: 'gpt-4o-mini',
     messages: openaiMessages,
-    max_tokens: 120,
+    max_tokens: 160,
     temperature: 0.4,
   });
 

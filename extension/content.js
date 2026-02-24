@@ -993,12 +993,14 @@
     renderWidget(); scrollChat();
 
     const instrHint  = stripHtml(steps[training.stepIndex]?.instruction || '');
-    const phaseHint  = steps[training.stepIndex]?.phaseName ? ` We're in the "${steps[training.stepIndex].phaseName}" phase.` : '';
+    const phaseHint  = steps[training.stepIndex]?.phaseName ? ` Phase: "${steps[training.stepIndex].phaseName}".` : '';
     const prompt = instrHint
-      ? `[Next step.${phaseHint} Step: "${instrHint}". One warm sentence explaining WHY — no longer.]`
-      : `[Next step.${phaseHint} One sentence: what to do and why it matters.]`;
+      ? `[STEP ${training.stepIndex + 1}/${steps.length}.${phaseHint} Tell the user what to do: "${instrHint}". ONE sentence — action-first ("Now…" / "Next…" / "Go ahead and…"), then why it matters. NEVER start with "Great", "Well done", or any praise.]`
+      : `[STEP ${training.stepIndex + 1}/${steps.length}.${phaseHint} Tell the user what to do next — one specific, action-first sentence. NEVER start with praise.]`;
 
-    const historyWithPrompt = [...training.chatHistory, { role: 'user', content: prompt }];
+    // Trim to last 4 messages so stale greet context can't confuse Sarah
+    const recentHistory = training.chatHistory.slice(-4);
+    const historyWithPrompt = [...recentHistory, { role: 'user', content: prompt }];
     callSarahPlay(historyWithPrompt, 'chat').then(({ reply }) => {
       training.isTyping = false;
       if (!trainingEl) return;
