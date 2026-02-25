@@ -260,8 +260,10 @@
         if (step?.element && isTargetElement(clicked, step.element)) {
           // User clicked exactly the right element — advance immediately, no AI needed
           handleNextSilent();
+        } else {
+          // No exact match — schedule observe so Sarah can check if the action was completed
+          scheduleAutoObserve();
         }
-        // No match → do nothing (no chatty AI calls for wrong clicks)
       };
       document.addEventListener('click', onPageClickHandler, { capture: true, passive: true });
 
@@ -798,6 +800,13 @@
       messages = history;
     }
 
+    // CHAT mode: sending all steps causes gpt-4o-mini to pick the wrong step.
+    // The explicit [STEP] prompt already contains the instruction — trim to ±3 steps.
+    // OBSERVE and GREET modes need full list for element evidence and journey context.
+    const stepsForContext = mode === 'chat'
+      ? allSteps.slice(Math.max(0, stepIndex - 2), stepIndex + 4)
+      : allSteps;
+
     const result = await chrome.runtime.sendMessage({
       type: 'CALL_SARAH_PLAY',
       messages,
@@ -805,7 +814,7 @@
         walkthroughTitle: title,
         stepIndex,
         totalSteps: steps.length,
-        allSteps,
+        allSteps: stepsForContext,
         mode,
         platformSummary: training.platformSummary,
         coachingNotes:   training.coachingNotes,
