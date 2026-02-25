@@ -260,8 +260,9 @@
         if (step?.element && isTargetElement(clicked, step.element)) {
           // User clicked exactly the right element — advance immediately, no AI needed
           handleNextSilent();
-        } else {
-          // No exact match — schedule observe so Sarah can check if the action was completed
+        } else if (isInteractiveForObserve(clicked)) {
+          // Click was on a genuinely interactive element — Sarah should check if step completed.
+          // Bare divs, text nodes, labels, and structural containers are ignored.
           scheduleAutoObserve();
         }
       };
@@ -428,6 +429,75 @@
       }
     }
 
+    return false;
+  }
+
+  // ─── Narration Validator ──────────────────────────────────────────────────────
+  // After getting Sarah's narration, verify it mentions at least one meaningful keyword
+  // from the step instruction. If not, discard it and return a safe template fallback.
+  // This catches the "narrating the wrong step" failure before the user sees it.
+  // Zero added latency — pure string operation on the already-returned reply.
+  function validateStepNarration(reply, instruction) {
+    if (!reply) return instruction ? `Now, ${instruction}.` : null;
+    if (!instruction) return reply;
+
+    const STOPWORDS = new Set([
+      'this','that','with','from','your','will','have','been','then','when',
+      'what','which','into','just','also','here','make','sure','need','want',
+      'next','step','click','select','choose','open','close','enter','type',
+      'fill','button','field','menu','icon','page','list','item','area',
+    ]);
+
+    const keywords = instruction
+      .toLowerCase()
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 4 && !STOPWORDS.has(w));
+
+    if (keywords.length === 0) return reply; // too short to validate
+
+    const replyLower = reply.toLowerCase();
+    const hasMatch = keywords.some((kw) => replyLower.includes(kw));
+
+    if (!hasMatch) {
+      // Sarah narrated something unrelated — safe template is always correct
+      return `Now, ${instruction}.`;
+    }
+    return reply;
+  }
+
+  // ─── Interactive Element Guard ────────────────────────────────────────────────
+  // Returns true only for elements that can genuinely complete a step.
+  // Prevents autoObserve from firing on bare divs, text nodes, labels, etc.
+  function isInteractiveForObserve(el) {
+    if (!el || el === document.body) return false;
+    const tag = (el.tagName || '').toLowerCase();
+    const nativeTags = new Set(['button','a','input','select','textarea','summary','option','optgroup']);
+    if (nativeTags.has(tag)) return true;
+
+    const role = (el.getAttribute?.('role') || '').toLowerCase();
+    const interactiveRoles = new Set([
+      'button','link','menuitem','menuitemcheckbox','menuitemradio',
+      'option','radio','checkbox','switch','tab','gridcell',
+      'treeitem','row','columnheader','combobox','listbox','slider',
+      'spinbutton','searchbox','textbox',
+    ]);
+    if (role && interactiveRoles.has(role)) return true;
+
+    if (el.getAttribute?.('onclick') != null) return true;
+    if (el.getAttribute?.('data-action') != null) return true;
+    const ti = el.getAttribute?.('tabindex');
+    if (ti != null && ti !== '-1') return true;
+
+    // Walk up 2 parents — a <span> inside a <button> should qualify
+    let parent = el.parentElement;
+    for (let i = 0; i < 2 && parent && parent !== document.body; i++) {
+      const ptag = (parent.tagName || '').toLowerCase();
+      if (nativeTags.has(ptag)) return true;
+      const prole = (parent.getAttribute?.('role') || '').toLowerCase();
+      if (prole && interactiveRoles.has(prole)) return true;
+      parent = parent.parentElement;
+    }
     return false;
   }
 
@@ -829,8 +899,9 @@
     };
   }
 
-  // Auto-observe: proactively checks the screen after page clicks / URL changes.
-  // Silent when no advancement — only updates chat if Sarah detects progress.
+  // Auto-observe: proactively checks the screen after interactive page actions / URL changes.
+  // Silent when no advancement — only updates chat if Sarah detects confirmed progress.
+  // All advancement routed through narrateAndAdvanceTo() — no direct stepIndex writes here.
   async function autoObserve() {
     if (!trainingEl || training.isTyping || training.isObserving) return;
     if (training.minimized) return;
@@ -840,21 +911,29 @@
     setObservingIndicator(true);
 
     try {
-      const { reply, detectedStep } = await callSarahPlay(training.chatHistory, 'observe');
+      const { reply, detectedStep: rawDetected } = await callSarahPlay(training.chatHistory, 'observe');
       if (!trainingEl) return;
       training.isObserving = false;
       setObservingIndicator(false);
 
-      if (detectedStep > training.stepIndex) {
-        lastAdvancementTime = Date.now(); // cooldown starts now
-        training.stepIndex = detectedStep;
-        highlightStep(training.steps[training.stepIndex]);
-        if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
-        renderWidget();
-        scrollChat();
-        scheduleProactiveHint(); // start idle timer for the new step
+      // Clamp: never jump more than 3 steps ahead (prevents hallucinated large jumps).
+      const maxAllowed  = training.stepIndex + 3;
+      const detectedStep = Math.min(rawDetected, maxAllowed);
+
+      if (detectedStep <= training.stepIndex) {
+        // No advancement — always silent. Do not touch chat, do not re-render.
+        return;
       }
-      // No advancement → silent, don't re-render, don't touch chat
+
+      // Validate observe reply before using it. A wrong-step reply gets replaced by
+      // the template; narrateAndAdvanceTo will use it directly (no second API call).
+      const targetStep = training.steps[detectedStep] || training.steps[training.stepIndex];
+      const instrForValidation = stripHtml(targetStep?.instruction || '');
+      const safeReply = reply ? validateStepNarration(reply, instrForValidation) : null;
+
+      // Route through the single advancement gateway.
+      await narrateAndAdvanceTo(detectedStep, safeReply);
+
     } catch {
       training.isObserving = false;
       setObservingIndicator(false);
@@ -871,6 +950,92 @@
   function cancelAutoObserve() {
     clearTimeout(observeDebounceTimer);
     observeDebounceTimer = null;
+  }
+
+  // ─── Single Advancement Gateway ───────────────────────────────────────────────
+  // ALL step-advancement paths call this function. It owns the state write and the
+  // narration call atomically. No caller ever writes training.stepIndex directly.
+  //
+  // targetIndex  — 0-based index to advance TO (the final value, not +1)
+  // observeReply — optional pre-validated reply from observe mode; when supplied,
+  //                no second API call is made (saves a round trip).
+  async function narrateAndAdvanceTo(targetIndex, observeReply = null) {
+    if (!trainingEl) return;
+    if (training.isTyping || training.isObserving) return; // reentrance guard
+    if (targetIndex <= training.stepIndex) return;         // never go backward here
+    if (targetIndex >= training.steps.length) return;      // clamp to valid range
+
+    const { steps, phases } = training;
+    cancelAutoObserve();
+    cancelProactiveHint();
+
+    const prevInstruction = stripHtml(steps[training.stepIndex]?.instruction || '');
+    const prevPhaseIndex  = steps[training.stepIndex]?.phaseIndex ?? -1;
+
+    // ── 1. Write state atomically ──────────────────────────────────────────────
+    training.stepIndex = targetIndex;
+    training.pendingSkipConfirm = false;
+    lastAdvancementTime = Date.now();
+
+    // Auto-skip consecutive duplicate instructions (click→input→change on same field)
+    while (
+      training.stepIndex + 1 < steps.length &&
+      prevInstruction &&
+      stripHtml(steps[training.stepIndex]?.instruction || '') === prevInstruction
+    ) {
+      training.stepIndex++;
+      lastAdvancementTime = Date.now();
+    }
+
+    // ── 2. Visual update ───────────────────────────────────────────────────────
+    highlightStep(steps[training.stepIndex]);
+    logEvent('step_advance', training.stepIndex);
+
+    // ── 3. Phase transition message ────────────────────────────────────────────
+    const newPhaseIndex     = steps[training.stepIndex]?.phaseIndex ?? -1;
+    const isPhaseTransition = newPhaseIndex > prevPhaseIndex && newPhaseIndex >= 0;
+    if (isPhaseTransition && phases && phases[newPhaseIndex]?.transitionMessage) {
+      training.chatHistory = [
+        ...training.chatHistory,
+        { role: 'assistant', content: phases[newPhaseIndex].transitionMessage },
+      ];
+      renderWidget(); scrollChat();
+    }
+
+    // ── 4. Narration ───────────────────────────────────────────────────────────
+    training.isTyping = true;
+    renderWidget(); scrollChat();
+
+    // Fast path: observe mode already produced a validated reply — use it directly.
+    if (observeReply) {
+      training.isTyping = false;
+      training.chatHistory = [...training.chatHistory, { role: 'assistant', content: observeReply }];
+      renderWidget(); scrollChat();
+      scheduleProactiveHint();
+      return;
+    }
+
+    // Standard narration: ask Sarah to coach the current step.
+    const instrHint = stripHtml(steps[training.stepIndex]?.instruction || '');
+    const phaseHint = steps[training.stepIndex]?.phaseName
+      ? ` Phase: "${steps[training.stepIndex].phaseName}".`
+      : '';
+    const prompt = instrHint
+      ? `[STEP ${training.stepIndex + 1}/${steps.length}.${phaseHint} Tell the user what to do: "${instrHint}". ONE sentence — action-first ("Now…" / "Next…" / "Go ahead and…"), then why it matters. NEVER start with "Great", "Well done", or any praise.]`
+      : `[STEP ${training.stepIndex + 1}/${steps.length}.${phaseHint} Tell the user what to do next — one specific, action-first sentence. NEVER start with praise.]`;
+
+    const recentHistory    = training.chatHistory.slice(-4);
+    const historyWithPrompt = [...recentHistory, { role: 'user', content: prompt }];
+
+    callSarahPlay(historyWithPrompt, 'chat').then(({ reply }) => {
+      training.isTyping = false;
+      if (!trainingEl) return;
+      const instrForValidation = stripHtml(steps[training.stepIndex]?.instruction || '');
+      const safeReply = validateStepNarration(reply, instrForValidation);
+      if (safeReply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: safeReply }];
+      renderWidget(); scrollChat();
+      scheduleProactiveHint();
+    }).catch(() => { training.isTyping = false; renderWidget(); });
   }
 
   // Proactive hint: if user is idle on a step for 25s, Sarah offers a visual hint.
@@ -945,15 +1110,13 @@
     return -1;
   }
 
-  // Advance to a specific step index via URL match — jump ahead if multiple steps matched.
+  // Advance to a specific step index via URL match.
+  // Removed the pre-decrement trick — narrateAndAdvanceTo receives the final target directly.
   function advanceToStep(targetStep) {
     if (!trainingEl) return;
     if (targetStep <= training.stepIndex || targetStep >= training.steps.length) return;
     if (Date.now() - lastAdvancementTime < 1500) return; // prevent rapid-fire duplicates
-    if (training.isTyping || training.isObserving) return; // don't interrupt while Sarah is busy
-    training.pendingSkipConfirm = false;
-    training.stepIndex = targetStep - 1; // doAdvance will increment by 1
-    doAdvance();
+    narrateAndAdvanceTo(targetStep);
   }
 
   function startUrlPolling() {
@@ -1039,67 +1202,12 @@
     scrollChat();
   }
 
-  // Advance one step — shared by URL detection, "Got it", and skip paths.
-  // Always calls Sarah for a narrative response (using phase + step context),
-  // so she explains WHY the next step matters, not just WHAT to click.
+  // Advance one step — thin wrapper around the single gateway.
+  // Called by handleNext() ("Got it") and handleNextSilent() (element click).
   function doAdvance() {
     if (!trainingEl) return;
-    if (training.isTyping) return; // prevent concurrent calls while Sarah is responding
-    cancelProactiveHint(); // clear any pending idle hint for the step we're leaving
-    const { steps, phases } = training;
-    if (training.stepIndex + 1 >= steps.length) return;
-
-    const prevInstruction = stripHtml(steps[training.stepIndex]?.instruction || '');
-    const prevPhaseIndex  = steps[training.stepIndex]?.phaseIndex ?? -1;
-    training.stepIndex++;
-    training.pendingSkipConfirm = false;
-    lastAdvancementTime = Date.now();
-
-    // Auto-skip consecutive steps with the same instruction (e.g. click→input→change on same field
-    // all get the same AI instruction — no need to narrate "Enter project name" three times).
-    while (
-      training.stepIndex + 1 < steps.length &&
-      prevInstruction &&
-      stripHtml(steps[training.stepIndex]?.instruction || '') === prevInstruction
-    ) {
-      training.stepIndex++;
-      lastAdvancementTime = Date.now();
-    }
-
-    highlightStep(steps[training.stepIndex]);
-    logEvent('step_advance', training.stepIndex);
-
-    const newPhaseIndex  = steps[training.stepIndex]?.phaseIndex ?? -1;
-    const isPhaseTransition = newPhaseIndex > prevPhaseIndex && newPhaseIndex >= 0;
-
-    // Phase transition: show the pre-generated transition message, then let Sarah add the first step
-    if (isPhaseTransition && phases && phases[newPhaseIndex]?.transitionMessage) {
-      const msg = phases[newPhaseIndex].transitionMessage;
-      training.chatHistory = [...training.chatHistory, { role: 'assistant', content: msg }];
-      renderWidget(); scrollChat();
-      // Don't return — fall through to also get Sarah to narrate the first step of the new phase
-    }
-
-    // Ask Sarah to narrate the current step with context — never just repeat the instruction
-    training.isTyping = true;
-    renderWidget(); scrollChat();
-
-    const instrHint  = stripHtml(steps[training.stepIndex]?.instruction || '');
-    const phaseHint  = steps[training.stepIndex]?.phaseName ? ` Phase: "${steps[training.stepIndex].phaseName}".` : '';
-    const prompt = instrHint
-      ? `[STEP ${training.stepIndex + 1}/${steps.length}.${phaseHint} Tell the user what to do: "${instrHint}". ONE sentence — action-first ("Now…" / "Next…" / "Go ahead and…"), then why it matters. NEVER start with "Great", "Well done", or any praise.]`
-      : `[STEP ${training.stepIndex + 1}/${steps.length}.${phaseHint} Tell the user what to do next — one specific, action-first sentence. NEVER start with praise.]`;
-
-    // Trim to last 4 messages so stale greet context can't confuse Sarah
-    const recentHistory = training.chatHistory.slice(-4);
-    const historyWithPrompt = [...recentHistory, { role: 'user', content: prompt }];
-    callSarahPlay(historyWithPrompt, 'chat').then(({ reply }) => {
-      training.isTyping = false;
-      if (!trainingEl) return;
-      if (reply) training.chatHistory = [...training.chatHistory, { role: 'assistant', content: reply }];
-      renderWidget(); scrollChat();
-      scheduleProactiveHint(); // start 25s idle timer for the new step
-    }).catch(() => { training.isTyping = false; renderWidget(); });
+    if (training.stepIndex + 1 >= training.steps.length) return;
+    narrateAndAdvanceTo(training.stepIndex + 1);
   }
 
   // "Got it →": trust the user and advance immediately.

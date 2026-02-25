@@ -185,20 +185,25 @@ export async function POST(req: NextRequest) {
     ...buildMessages(messages, imgToAttach),
   ];
 
+  // Observe mode: gpt-4o (stronger vision, reliable structured JSON output).
+  // Chat/greet/hint: gpt-4o-mini (fast, low cost, sufficient for text coaching).
+  const isObserve = resolvedMode === 'observe';
+
   const completion = await openai.chat.completions.create({
-    model: 'gpt-4o-mini',
+    model: isObserve ? 'gpt-4o' : 'gpt-4o-mini',
     messages: openaiMessages,
-    max_tokens: 160,
-    temperature: 0.4,
+    max_tokens: isObserve ? 120 : 160,
+    temperature: isObserve ? 0.1 : 0.4,
+    ...(isObserve ? { response_format: { type: 'json_object' as const } } : {}),
   });
 
   const rawReply = completion.choices[0].message.content?.trim() ?? '';
 
-  if (resolvedMode === 'observe') {
+  if (isObserve) {
     try {
-      // GPT sometimes wraps JSON in markdown fences — strip them
-      const jsonMatch = rawReply.match(/\{[\s\S]*\}/);
-      const parsed = JSON.parse(jsonMatch?.[0] ?? rawReply);
+      // response_format: json_object guarantees valid JSON — direct parse is safe.
+      // No regex extraction needed.
+      const parsed = JSON.parse(rawReply);
       // Clamp: Sarah can never go backward, can never go past last step
       const detectedStep = typeof parsed.detectedStep === 'number'
         ? Math.max(stepIndex, Math.min(parsed.detectedStep, totalSteps - 1))
@@ -206,7 +211,7 @@ export async function POST(req: NextRequest) {
       const reply = String(parsed.reply ?? '');
       return NextResponse.json({ reply, detectedStep });
     } catch {
-      // JSON parse failed — safe default: no advancement, no message
+      // Defensive fallback even with json_object mode
       return NextResponse.json({ reply: '', detectedStep: stepIndex });
     }
   }
