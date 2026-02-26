@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 export default function ExtensionPage() {
+  const [showToken, setShowToken] = useState(false);
   const [token, setToken]   = useState('');
   const [copied, setCopied] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -51,7 +52,7 @@ export default function ExtensionPage() {
       }}>
 
         {/* Steps */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 32 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
 
           {/* Step 1 — Install */}
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
@@ -102,7 +103,7 @@ export default function ExtensionPage() {
             </div>
           </div>
 
-          {/* Step 2 — Token */}
+          {/* Step 2 — Auto-connect */}
           <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
             <div style={{
               width: 32, height: 32, borderRadius: '50%', flexShrink: 0,
@@ -112,10 +113,10 @@ export default function ExtensionPage() {
             }}>2</div>
             <div>
               <div style={{ fontSize: 15, fontWeight: 600, color: '#1A1D26', marginBottom: 2 }}>
-                Generate a connection token
+                Open the extension — it connects automatically
               </div>
               <div style={{ fontSize: 14, color: '#8B92A5', lineHeight: 1.5 }}>
-                Click below to create a secure token, then paste it into the extension popup.
+                Click the Hoponai icon in your Chrome toolbar. Since you&apos;re already signed in, it connects to your account instantly — no setup needed.
               </div>
             </div>
           </div>
@@ -140,69 +141,72 @@ export default function ExtensionPage() {
 
         </div>
 
-        <hr style={{ border: 'none', borderTop: '1px solid #E8ECF2', margin: '24px 0' }} />
+        {/* Troubleshooting — collapsed by default */}
+        <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid #E8ECF2' }}>
+          <button
+            onClick={() => { setShowToken((v) => !v); if (!showToken && !token) generateToken(); }}
+            style={{
+              background: 'none', border: 'none', padding: 0,
+              fontSize: 13, color: '#8B92A5', cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}
+          >
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+              style={{ transform: showToken ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 0.15s' }}>
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+            Extension not connecting? Use a manual token
+          </button>
 
-        {/* Token generation */}
-        <div style={{ fontSize: 15, fontWeight: 600, color: '#1A1D26', marginBottom: 8 }}>
-          Connection Token
-        </div>
-        <p style={{ fontSize: 14, color: '#8B92A5', marginBottom: 16, lineHeight: 1.5 }}>
-          This token is valid for 30 days. Paste it into the extension popup to connect it to your account.
-        </p>
-
-        {!token ? (
-          <>
-            <button
-              onClick={generateToken}
-              disabled={loading}
-              style={{
-                background: '#0EA5E9', color: '#fff', padding: '10px 24px',
-                borderRadius: 8, fontWeight: 600, fontSize: 14, border: 'none',
-                cursor: loading ? 'wait' : 'pointer', opacity: loading ? 0.7 : 1,
-              }}
-            >
-              {loading ? 'Generating…' : 'Generate Connection Token'}
-            </button>
-            {error && (
-              <p style={{ marginTop: 8, fontSize: 13, color: '#EF4444' }}>{error}</p>
-            )}
-          </>
-        ) : (
-          <div>
-            <div style={{
-              display: 'flex', gap: 8, alignItems: 'center',
-              background: '#F8FAFC', border: '1px solid #E8ECF2',
-              borderRadius: 8, padding: '10px 12px',
-            }}>
-              <code style={{
-                flex: 1, fontSize: 12, color: '#4A5168',
-                wordBreak: 'break-all', fontFamily: 'monospace',
-              }}>
-                {token}
-              </code>
-              <button
-                onClick={copyToken}
-                style={{
-                  flexShrink: 0, background: copied ? '#10B981' : '#0EA5E9',
-                  color: '#fff', border: 'none', borderRadius: 6,
-                  padding: '6px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                  transition: 'background 0.2s',
-                }}
-              >
-                {copied ? 'Copied!' : 'Copy'}
-              </button>
+          {showToken && (
+            <div style={{ marginTop: 16 }}>
+              <p style={{ fontSize: 13, color: '#8B92A5', marginBottom: 12, lineHeight: 1.5 }}>
+                If you&apos;re using a different Chrome profile or the extension doesn&apos;t auto-connect, paste this token into the extension popup.
+              </p>
+              {loading ? (
+                <div style={{ fontSize: 13, color: '#8B92A5' }}>Generating…</div>
+              ) : error ? (
+                <p style={{ fontSize: 13, color: '#EF4444' }}>{error}</p>
+              ) : token ? (
+                <div>
+                  <div style={{
+                    display: 'flex', gap: 8, alignItems: 'center',
+                    background: '#F8FAFC', border: '1px solid #E8ECF2',
+                    borderRadius: 8, padding: '10px 12px',
+                  }}>
+                    <code style={{
+                      flex: 1, fontSize: 12, color: '#4A5168',
+                      wordBreak: 'break-all', fontFamily: 'monospace',
+                    }}>
+                      {token}
+                    </code>
+                    <button
+                      onClick={copyToken}
+                      style={{
+                        flexShrink: 0, background: copied ? '#10B981' : '#0EA5E9',
+                        color: '#fff', border: 'none', borderRadius: 6,
+                        padding: '6px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                        transition: 'background 0.2s',
+                      }}
+                    >
+                      {copied ? 'Copied!' : 'Copy'}
+                    </button>
+                  </div>
+                  <button
+                    onClick={generateToken}
+                    style={{
+                      marginTop: 8, background: 'none', border: 'none',
+                      fontSize: 12, color: '#8B92A5', cursor: 'pointer', padding: 0,
+                    }}
+                  >
+                    Regenerate
+                  </button>
+                </div>
+              ) : null}
             </div>
-            <button
-              onClick={generateToken}
-              style={{
-                marginTop: 8, background: 'none', border: 'none',
-                fontSize: 13, color: '#8B92A5', cursor: 'pointer', padding: 0,
-              }}
-            >
-              Regenerate token
-            </button>
-          </div>
-        )}
+          )}
+        </div>
+
       </div>
     </div>
   );
