@@ -28,6 +28,7 @@ export default function PlayerClient({ shareToken, title, description, steps }: 
   const [isTyping, setIsTyping] = useState(false);
   const [chatInput, setChatInput] = useState('');
   const [isDone, setIsDone] = useState(false);
+  const [extDetected, setExtDetected] = useState<boolean | null>(null);
   const chatAreaRef = useRef<HTMLDivElement>(null);
   const hasMounted = useRef(false);
 
@@ -66,6 +67,14 @@ export default function PlayerClient({ shareToken, title, description, steps }: 
     const data = await res.json();
     return data.reply as string;
   }
+
+  // Detect extension
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setExtDetected(document.documentElement.hasAttribute('data-hoponai-ext'));
+    }, 600);
+    return () => clearTimeout(t);
+  }, []);
 
   // Greet on mount
   useEffect(() => {
@@ -194,6 +203,11 @@ export default function PlayerClient({ shareToken, title, description, steps }: 
               ✓ Complete
             </div>
           )}
+          {extDetected === true && (
+            <div style={{ fontSize: 12, color: '#22C55E', fontWeight: 600, flexShrink: 0 }}>
+              ● Extension active
+            </div>
+          )}
         </div>
 
         {/* Progress bar */}
@@ -204,6 +218,53 @@ export default function PlayerClient({ shareToken, title, description, steps }: 
             transition: 'width 0.4s ease',
           }} />
         </div>
+
+        {/* Extension install banner */}
+        {extDetected === false && (
+          <div style={{
+            background: '#EFF6FF', borderBottom: '1px solid #BFDBFE',
+            padding: '12px 24px', display: 'flex', alignItems: 'center',
+            gap: 16, flexShrink: 0,
+          }}>
+            <div style={{ flex: 1 }}>
+              <span style={{ fontSize: 14, fontWeight: 700, color: '#1E40AF' }}>
+                Get AI coaching directly inside the app
+              </span>
+              <span style={{ fontSize: 13, color: '#3B82F6', marginLeft: 8 }}>
+                Install the Hoponai extension to have Sarah guide you in real-time.
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexShrink: 0, alignItems: 'center' }}>
+              {process.env.NEXT_PUBLIC_CHROME_STORE_URL ? (
+                <a
+                  href={process.env.NEXT_PUBLIC_CHROME_STORE_URL}
+                  target="_blank" rel="noreferrer"
+                  style={{
+                    background: '#1D4ED8', color: '#fff', padding: '8px 16px',
+                    borderRadius: 8, fontSize: 13, fontWeight: 600, textDecoration: 'none',
+                  }}
+                >
+                  Add to Chrome
+                </a>
+              ) : (
+                <span style={{ fontSize: 13, color: '#6B7280', fontStyle: 'italic' }}>
+                  Extension coming soon
+                </span>
+              )}
+              <button
+                onClick={() => window.location.reload()}
+                style={{
+                  background: '#fff', color: '#3B82F6', border: '1px solid #BFDBFE',
+                  padding: '8px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                  fontWeight: 500,
+                }}
+                title="Click after installing to detect the extension"
+              >
+                ↻ Already installed
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Main two-panel layout */}
         <div

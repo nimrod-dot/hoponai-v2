@@ -1,6 +1,11 @@
 // @ts-check
 'use strict';
 
+// Signal to hoponai.com play pages that the extension is installed
+if (window.location.hostname === 'hoponai.com' || window.location.hostname === 'www.hoponai.com') {
+  document.documentElement.setAttribute('data-hoponai-ext', '1');
+}
+
 // ─── Guard: prevent double-injection when chrome.scripting re-injects this file
 (() => {
   if (window.__hoponai_cs__) return;
