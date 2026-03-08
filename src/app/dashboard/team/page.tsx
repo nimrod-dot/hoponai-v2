@@ -62,7 +62,7 @@ export default function TeamPage() {
         <h2 style={{ fontSize: 16, fontWeight: 600, color: '#1A1D26', marginBottom: 16 }}>
           Invite Team Member
         </h2>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'flex-end', flexWrap: 'wrap' }}>
           <div style={{ flex: 1 }}>
             <label style={{ fontSize: 13, fontWeight: 500, color: '#4A5168', display: 'block', marginBottom: 6 }}>
               Email
@@ -125,6 +125,7 @@ export default function TeamPage() {
         background: '#fff', borderRadius: 12,
         border: '1px solid #E8ECF2', overflow: 'hidden',
       }}>
+        <div style={{ overflowX: 'auto' }}>
         <table style={{ width: '100%', borderCollapse: 'collapse' }}>
           <thead>
             <tr style={{ background: '#F8F9FC' }}>
@@ -159,6 +160,7 @@ export default function TeamPage() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
