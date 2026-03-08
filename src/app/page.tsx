@@ -29,7 +29,7 @@ function LogoBar() {
   );
 }
 
-function VideoPlaceholder() {
+function VideoSection() {
   return (
     <section style={{ background: 'var(--bg)', padding: '80px 1.5rem', borderTop: '1px solid var(--border)' }}>
       <div style={{ maxWidth: 860, margin: '0 auto' }}>
@@ -42,26 +42,18 @@ function VideoPlaceholder() {
           </p>
         </Reveal>
         <Reveal delay={0.15}>
-          {/* VIDEO PLACEHOLDER - Replace with: <iframe src="https://www.youtube.com/embed/YOUR_ID" .../> */}
           <div id="demo-video" style={{
-            position: 'relative', width: '100%', paddingBottom: '56.25%',
             borderRadius: 16, overflow: 'hidden', border: '1px solid var(--border)',
-            background: '#0F172A', boxShadow: '0 12px 48px rgba(0,0,0,0.1)',
+            boxShadow: '0 12px 48px rgba(0,0,0,0.1)', background: '#0F172A',
           }}>
-            <div style={{
-              position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column',
-              alignItems: 'center', justifyContent: 'center', gap: 16,
-            }}>
-              <div style={{
-                width: 72, height: 72, borderRadius: '50%',
-                background: 'rgba(14,165,233,0.9)', display: 'flex',
-                alignItems: 'center', justifyContent: 'center',
-                boxShadow: '0 4px 24px rgba(14,165,233,0.3)',
-              }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="white"><polygon points="8,5 20,12 8,19" /></svg>
-              </div>
-              <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14 }}>Product demo coming soon</span>
-            </div>
+            <video
+              controls
+              playsInline
+              style={{ width: '100%', display: 'block' }}
+            >
+              <source src="/hoponai_main.mp4" type="video/mp4" />
+              Your browser does not support the video tag.
+            </video>
           </div>
         </Reveal>
       </div>
@@ -139,7 +131,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <VideoPlaceholder />
+      <VideoSection />
 
       {/* Sarah infographic */}
       <section style={{ background: 'var(--white)', padding: '80px 1.5rem', borderTop: '1px solid var(--border)' }}>

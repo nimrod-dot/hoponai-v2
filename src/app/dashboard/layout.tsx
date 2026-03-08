@@ -1,7 +1,7 @@
 import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { createServerClient } from '@/lib/supabase';
-import DashboardShell from '@/components/dashboard/DashboardShell';
+import DashboardShell from './DashboardShell';
 
 export default async function DashboardLayout({
   children,
@@ -17,11 +17,6 @@ export default async function DashboardLayout({
     .select('*, organizations(*)')
     .eq('clerk_user_id', userId)
     .single();
-
-  // If not onboarded, redirect to questionnaire
-  if (user && !user.onboarded) {
-    redirect('/onboard');
-  }
 
   return <DashboardShell user={user}>{children}</DashboardShell>;
 }

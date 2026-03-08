@@ -1,21 +1,89 @@
 import { auth } from '@clerk/nextjs/server';
 import { createServerClient } from '@/lib/supabase';
-import { NextResponse } from 'next/server';
+import { verifyExtensionToken, extractBearerToken } from '@/lib/extension-token';
+import { NextRequest, NextResponse } from 'next/server';
 
-// Extension sends recorded walkthrough data here
-export async function POST(req: Request) {
-  const { userId } = await auth();
-  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-
+// ── Helper: resolve DB user from Bearer token or Clerk cookie ──────────────────
+async function resolveUser(req: NextRequest) {
   const supabase = createServerClient();
+  const bearerToken = extractBearerToken(req.headers.get('Authorization'));
 
-  const { data: user } = await supabase
+  if (bearerToken) {
+    const verified = verifyExtensionToken(bearerToken);
+    if (!verified) return null;
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, org_id, role')
+      .eq('id', verified.userId)
+      .single();
+    return user ?? null;
+  }
+
+  const { userId } = await auth();
+  if (!userId) return null;
+  const { data: clerkUser } = await supabase
     .from('users')
     .select('id, org_id, role')
     .eq('clerk_user_id', userId)
     .single();
+  return clerkUser ?? null;
+}
 
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+// ── GET: list ready walkthroughs, or full detail with ?id= ────────────────────
+export async function GET(req: NextRequest) {
+  const supabase = createServerClient();
+  const user = await resolveUser(req);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const walkthroughId = req.nextUrl.searchParams.get('id');
+
+  if (walkthroughId) {
+    // Full walkthrough including steps + platform metadata (for training widget)
+    const { data: w } = await supabase
+      .from('walkthroughs')
+      .select('id, title, description, steps, status, metadata')
+      .eq('id', walkthroughId)
+      .eq('org_id', user.org_id)
+      .eq('status', 'ready')
+      .single();
+    if (!w) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json({
+      walkthrough: {
+        ...w,
+        metadata: {
+          platform_summary: (w.metadata as any)?.platform_summary ?? null,
+          coaching_notes:   (w.metadata as any)?.coaching_notes   ?? null,
+          platform_name:    (w.metadata as any)?.platform_name    ?? null,
+          phases:           (w.metadata as any)?.phases           ?? null,
+        },
+      },
+    });
+  }
+
+  // List only (no step bodies)
+  const { data: walkthroughs } = await supabase
+    .from('walkthroughs')
+    .select('id, title, description, status, created_at, metadata')
+    .eq('org_id', user.org_id)
+    .eq('status', 'ready')
+    .order('created_at', { ascending: false });
+
+  const list = (walkthroughs ?? []).map((w) => ({
+    id: w.id,
+    title: w.title,
+    description: w.description,
+    stepCount: w.metadata?.step_count ?? 0,
+  }));
+
+  return NextResponse.json({ walkthroughs: list });
+}
+
+// ── POST: upload a new walkthrough (from extension recording) ─────────────────
+export async function POST(req: NextRequest) {
+  const supabase = createServerClient();
+  const user = await resolveUser(req);
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
   if (!['owner', 'admin', 'trainer'].includes(user.role)) {
     return NextResponse.json({ error: 'Not authorized to record' }, { status: 403 });
   }
@@ -31,9 +99,9 @@ export async function POST(req: Request) {
       description: body.description,
       category: body.category,
       target_url: body.target_url,
-      steps: body.steps,        // JSON array of step data from extension
-      metadata: body.metadata,  // duration, screenshot count, etc.
-      status: 'processing',     // Sarah AI will process this
+      steps: body.steps,
+      metadata: body.metadata,
+      status: 'processing',
     })
     .select()
     .single();
@@ -41,12 +109,6 @@ export async function POST(req: Request) {
   if (error) {
     return NextResponse.json({ error: 'Failed to save walkthrough' }, { status: 500 });
   }
-
-  // TODO: Trigger Sarah AI processing pipeline here
-  // This is where Arik's service would be called to:
-  // 1. Process the DOM snapshots
-  // 2. Generate training modules
-  // 3. Update status to 'ready'
 
   return NextResponse.json({ walkthrough });
 }
