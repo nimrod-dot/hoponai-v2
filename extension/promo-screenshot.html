@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Hoponai — Promo Screenshot</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #e2e2e2;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      padding: 30px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      min-height: 100vh;
+    }
+    .instructions {
+      margin-bottom: 20px;
+      background: #fff;
+      border-radius: 10px;
+      padding: 14px 20px;
+      font-size: 13px;
+      color: #333;
+      max-width: 1280px;
+      width: 100%;
+      border: 1px solid #ddd;
+    }
+    .instructions strong { color: #0EA5E9; }
+    kbd {
+      background: #f0f0f0;
+      border: 1px solid #bbb;
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 12px;
+    }
+
+    /* ── 1280×800 browser mockup ── */
+    .browser {
+      width: 1280px;
+      height: 800px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+    }
+
+    /* Chrome toolbar */
+    .chrome-bar {
+      height: 52px;
+      background: #DEE1E6;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+    .win-btns { display: flex; gap: 6px; }
+    .win-btn { width: 12px; height: 12px; border-radius: 50%; }
+    .win-btn.close  { background: #FF5F57; }
+    .win-btn.min    { background: #FFBD2E; }
+    .win-btn.max    { background: #28C840; }
+    .tab-bar {
+      display: flex;
+      align-items: flex-end;
+      gap: 2px;
+      flex: 1;
+      margin-left: 10px;
+    }
+    .tab {
+      height: 36px;
+      padding: 0 16px;
+      background: #F1F3F4;
+      border-radius: 8px 8px 0 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      color: #555;
+      white-space: nowrap;
+      max-width: 200px;
+    }
+    .tab.active { background: #fff; color: #1A1D26; }
+    .tab-favicon {
+      width: 14px; height: 14px; border-radius: 3px;
+      background: linear-gradient(135deg, #6366F1, #0EA5E9);
+      flex-shrink: 0;
+    }
+    .address-bar {
+      height: 32px;
+      background: #F1F3F4;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      padding: 0 14px;
+      gap: 8px;
+      font-size: 13px;
+      color: #333;
+      width: 480px;
+      flex-shrink: 0;
+    }
+    .lock-icon { color: #555; font-size: 11px; }
+    .ext-icons { display: flex; gap: 4px; align-items: center; margin-left: 4px; }
+    .ext-icon {
+      width: 28px; height: 28px; border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; background: #1A1D26; color: #fff; font-weight: 700;
+      cursor: pointer;
+    }
+    .ext-icon.active { background: #0EA5E9; box-shadow: 0 0 0 2px #0EA5E980; }
+
+    /* ── Page content (fake SaaS app) ── */
+    .page-content {
+      flex: 1;
+      background: #F8FAFC;
+      display: flex;
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Sidebar */
+    .sidebar {
+      width: 220px;
+      background: #fff;
+      border-right: 1px solid #E8ECF2;
+      padding: 20px 0;
+      flex-shrink: 0;
+    }
+    .sidebar-logo {
+      padding: 0 20px 20px;
+      font-family: Georgia, serif;
+      font-size: 18px;
+      color: #1A1D26;
+      border-bottom: 1px solid #E8ECF2;
+      margin-bottom: 12px;
+    }
+    .sidebar-logo span { color: #0EA5E9; }
+    .nav-item {
+      padding: 9px 20px;
+      font-size: 13px;
+      color: #6B7280;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      cursor: pointer;
+    }
+    .nav-item.active {
+      background: #EFF6FF;
+      color: #0EA5E9;
+      font-weight: 600;
+      border-left: 3px solid #0EA5E9;
+    }
+    .nav-dot {
+      width: 16px; height: 16px; border-radius: 4px;
+      background: currentColor; opacity: 0.25;
+    }
+
+    /* Main area */
+    .main {
+      flex: 1;
+      padding: 28px 32px;
+      overflow: hidden;
+    }
+    .page-title {
+      font-size: 20px;
+      font-weight: 700;
+      color: #1A1D26;
+      margin-bottom: 4px;
+    }
+    .page-sub {
+      font-size: 13px;
+      color: #8B92A5;
+      margin-bottom: 24px;
+    }
+
+    /* Stats row */
+    .stats { display: flex; gap: 16px; margin-bottom: 24px; }
+    .stat-card {
+      flex: 1;
+      background: #fff;
+      border: 1px solid #E8ECF2;
+      border-radius: 12px;
+      padding: 16px;
+    }
+    .stat-label { font-size: 11px; color: #8B92A5; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 6px; }
+    .stat-value { font-size: 24px; font-weight: 700; color: #1A1D26; }
+    .stat-delta { font-size: 11px; color: #10B981; margin-top: 2px; }
+
+    /* Table */
+    .table-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+    .table-title { font-size: 15px; font-weight: 600; color: #1A1D26; }
+    .btn-new {
+      background: #0EA5E9;
+      color: #fff;
+      border: none;
+      border-radius: 7px;
+      padding: 7px 14px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .table {
+      background: #fff;
+      border: 1px solid #E8ECF2;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+    .table-row {
+      display: flex;
+      align-items: center;
+      padding: 11px 16px;
+      border-bottom: 1px solid #F1F5F9;
+      font-size: 13px;
+      color: #1A1D26;
+      gap: 12px;
+    }
+    .table-row.header { background: #F8FAFC; font-weight: 600; color: #6B7280; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .table-row:last-child { border-bottom: none; }
+    .col-name { flex: 2; display: flex; align-items: center; gap: 10px; }
+    .col-role { flex: 1.5; color: #6B7280; }
+    .col-status { flex: 1; }
+    .col-progress { flex: 1.5; }
+    .avatar-sm {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+    }
+    .badge {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .badge.green  { background: #D1FAE5; color: #065F46; }
+    .badge.blue   { background: #DBEAFE; color: #1D4ED8; }
+    .badge.yellow { background: #FEF3C7; color: #92400E; }
+    .progress-bar { height: 6px; background: #E8ECF2; border-radius: 3px; flex: 1; }
+    .progress-fill { height: 100%; border-radius: 3px; background: #0EA5E9; }
+
+    /* ── Hoponai popup overlay ── */
+    .popup-wrapper {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 340px;
+      height: 520px;
+      box-shadow: 0 16px 48px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.07);
+      border-radius: 12px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      font-size: 14px;
+      color: #1A1D26;
+      background: #F8FAFC;
+    }
+
+    /* Popup header */
+    .popup-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: #fff;
+      border-bottom: 1px solid #E8ECF2;
+      flex-shrink: 0;
+    }
+    .popup-logo { font-family: Georgia, serif; font-size: 15px; color: #1A1D26; display: flex; align-items: center; gap: 7px; }
+    .popup-logo span { color: #0EA5E9; }
+    .popup-logo-icon {
+      width: 20px; height: 20px; border-radius: 5px;
+      background: #1A1D26;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 700; color: #fff;
+    }
+    .popup-user { font-size: 11px; color: #8B92A5; text-align: right; line-height: 1.4; }
+    .popup-user strong { color: #1A1D26; display: block; font-size: 12px; }
+
+    /* Chat area */
+    .popup-chat {
+      flex: 1;
+      overflow: hidden;
+      padding: 12px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .pmsg { display: flex; align-items: flex-end; gap: 7px; }
+    .pmsg.sarah { align-self: flex-start; }
+    .pmsg.user  { align-self: flex-end; flex-direction: row-reverse; }
+    .pavatar {
+      width: 26px; height: 26px; border-radius: 50%;
+      background: linear-gradient(135deg, #0EA5E9, #6366F1);
+      color: #fff; font-size: 11px; font-weight: 700;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .pbubble {
+      padding: 9px 11px;
+      border-radius: 14px;
+      font-size: 12px;
+      line-height: 1.5;
+      max-width: 220px;
+    }
+    .pmsg.sarah .pbubble { background: #fff; border: 1px solid #E8ECF2; border-bottom-left-radius: 3px; }
+    .pmsg.user  .pbubble { background: #0EA5E9; color: #fff; border-bottom-right-radius: 3px; }
+
+    /* Chips */
+    .pchips { display: flex; flex-wrap: wrap; gap: 5px; padding-left: 33px; }
+    .pchip {
+      padding: 4px 11px; border-radius: 14px; font-size: 11px; font-weight: 600;
+      border: 1.5px solid #0EA5E9; background: #fff; color: #0EA5E9; cursor: pointer;
+    }
+
+    /* Recording badge */
+    .prec-badge {
+      display: inline-flex; align-items: center; gap: 5px;
+      font-size: 11px; font-weight: 600; color: #991B1B;
+      background: #FEF2F2; border: 1px solid #FECACA;
+      border-radius: 20px; padding: 3px 9px;
+      align-self: flex-start; margin-left: 33px;
+    }
+    .prec-dot { width: 6px; height: 6px; border-radius: 50%; background: #EF4444; }
+
+    /* Input bar */
+    .popup-input {
+      display: flex; align-items: center; gap: 7px;
+      padding: 9px 10px; background: #fff; border-top: 1px solid #E8ECF2;
+      flex-shrink: 0;
+    }
+    .popup-input input {
+      flex: 1; padding: 7px 11px; border: 1px solid #E8ECF2; border-radius: 18px;
+      font-size: 12px; background: #F8FAFC; color: #8B92A5; outline: none;
+    }
+    .popup-send {
+      width: 30px; height: 30px; border-radius: 50%; background: #0EA5E9;
+      border: none; display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0;
+    }
+    .popup-send svg { width: 14px; height: 14px; fill: #fff; }
+
+    /* Step highlight overlay on background */
+    .step-highlight {
+      position: absolute;
+      border: 2.5px solid #0EA5E9;
+      border-radius: 8px;
+      background: rgba(14, 165, 233, 0.06);
+      pointer-events: none;
+    }
+    .step-label {
+      position: absolute;
+      background: #0EA5E9;
+      color: #fff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 10px;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+
+<div class="instructions">
+  <strong>Instructions:</strong> Press <kbd>F11</kbd> for fullscreen, then use <kbd>Windows + Shift + S</kbd> to snip exactly the browser mockup below (the white rounded rectangle). Save as <strong>screenshot.png</strong>. The mockup is exactly 1280×800px.
+</div>
+
+<!-- ═══ Browser Mockup ═══ -->
+<div class="browser">
+
+  <!-- Chrome toolbar -->
+  <div class="chrome-bar">
+    <div class="win-btns">
+      <div class="win-btn close"></div>
+      <div class="win-btn min"></div>
+      <div class="win-btn max"></div>
+    </div>
+    <div class="tab-bar">
+      <div class="tab active">
+        <div class="tab-favicon"></div>
+        Team · Hoponai Dashboard
+      </div>
+      <div class="tab" style="opacity:0.6">New Tab</div>
+    </div>
+    <div class="address-bar">
+      <span class="lock-icon">🔒</span>
+      <span>app.hoponai.com/dashboard/team</span>
+    </div>
+    <div class="ext-icons">
+      <div class="ext-icon active">H</div>
+    </div>
+  </div>
+
+  <!-- Page -->
+  <div class="page-content">
+
+    <!-- Sidebar -->
+    <div class="sidebar">
+      <div class="sidebar-logo">hopon<span>ai</span></div>
+      <div class="nav-item"><div class="nav-dot"></div> Overview</div>
+      <div class="nav-item"><div class="nav-dot"></div> Walkthroughs</div>
+      <div class="nav-item active"><div class="nav-dot"></div> Team</div>
+      <div class="nav-item"><div class="nav-dot"></div> Analytics</div>
+      <div class="nav-item"><div class="nav-dot"></div> Extension</div>
+      <div class="nav-item"><div class="nav-dot"></div> Settings</div>
+    </div>
+
+    <!-- Main content -->
+    <div class="main">
+      <div class="page-title">Team Training</div>
+      <div class="page-sub">Track walkthrough progress for your team members</div>
+
+      <!-- Stats -->
+      <div class="stats">
+        <div class="stat-card">
+          <div class="stat-label">Members</div>
+          <div class="stat-value">12</div>
+          <div class="stat-delta">↑ 2 this month</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Walkthroughs</div>
+          <div class="stat-value">8</div>
+          <div class="stat-delta">↑ 3 this week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Completions</div>
+          <div class="stat-value">47</div>
+          <div class="stat-delta">↑ 12 this week</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Avg. Score</div>
+          <div class="stat-value">91%</div>
+          <div class="stat-delta">↑ 4% vs last month</div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="table-header">
+        <div class="table-title">Team Members</div>
+        <button class="btn-new">+ Invite member</button>
+      </div>
+      <div class="table">
+        <div class="table-row header">
+          <div class="col-name">Name</div>
+          <div class="col-role">Role</div>
+          <div class="col-status">Status</div>
+          <div class="col-progress">Progress</div>
+        </div>
+        <div class="table-row">
+          <div class="col-name"><div class="avatar-sm" style="background:#6366F1">JS</div> Jamie Salazar</div>
+          <div class="col-role">Sales Rep</div>
+          <div class="col-status"><span class="badge green">Active</span></div>
+          <div class="col-progress" style="display:flex;align-items:center;gap:8px"><div class="progress-bar"><div class="progress-fill" style="width:85%"></div></div><span style="font-size:11px;color:#6B7280">85%</span></div>
+        </div>
+        <div class="table-row">
+          <div class="col-name"><div class="avatar-sm" style="background:#0EA5E9">ML</div> Morgan Lee</div>
+          <div class="col-role">Onboarding</div>
+          <div class="col-status"><span class="badge blue">In training</span></div>
+          <div class="col-progress" style="display:flex;align-items:center;gap:8px"><div class="progress-bar"><div class="progress-fill" style="width:42%"></div></div><span style="font-size:11px;color:#6B7280">42%</span></div>
+        </div>
+        <div class="table-row">
+          <div class="col-name"><div class="avatar-sm" style="background:#10B981">AT</div> Alex Torres</div>
+          <div class="col-role">Support</div>
+          <div class="col-status"><span class="badge green">Active</span></div>
+          <div class="col-progress" style="display:flex;align-items:center;gap:8px"><div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div><span style="font-size:11px;color:#6B7280">100%</span></div>
+        </div>
+        <div class="table-row">
+          <div class="col-name"><div class="avatar-sm" style="background:#F59E0B">RK</div> Riley Kim</div>
+          <div class="col-role">Sales Rep</div>
+          <div class="col-status"><span class="badge yellow">Pending</span></div>
+          <div class="col-progress" style="display:flex;align-items:center;gap:8px"><div class="progress-bar"><div class="progress-fill" style="width:0%"></div></div><span style="font-size:11px;color:#6B7280">0%</span></div>
+        </div>
+        <div class="table-row">
+          <div class="col-name"><div class="avatar-sm" style="background:#8B5CF6">DN</div> Dana Nguyen</div>
+          <div class="col-role">Onboarding</div>
+          <div class="col-status"><span class="badge blue">In training</span></div>
+          <div class="col-progress" style="display:flex;align-items:center;gap:8px"><div class="progress-bar"><div class="progress-fill" style="width:63%"></div></div><span style="font-size:11px;color:#6B7280">63%</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step highlight on table row -->
+    <div class="step-highlight" style="left:242px;top:290px;width:700px;height:42px;"></div>
+    <div class="step-label" style="left:242px;top:275px;">Step 2 of 4 — Review team progress</div>
+
+    <!-- ── Hoponai Popup ── -->
+    <div class="popup-wrapper">
+      <div class="popup-header">
+        <div class="popup-logo">
+          <div class="popup-logo-icon">H</div>
+          hopon<span>ai</span>
+        </div>
+        <div class="popup-user">
+          <strong>Nimrod S.</strong>
+          hoponai.com
+        </div>
+      </div>
+
+      <div class="popup-chat">
+        <!-- Sarah message 1 -->
+        <div class="pmsg sarah">
+          <div class="pavatar">S</div>
+          <div class="pbubble">Hi Nimrod! 👋 I'm Sarah, your AI training coach. I'm here to help you record and deliver walkthroughs.</div>
+        </div>
+
+        <!-- User message -->
+        <div class="pmsg user">
+          <div class="pbubble">Record the team onboarding walkthrough</div>
+        </div>
+
+        <!-- Sarah message 2 -->
+        <div class="pmsg sarah">
+          <div class="pavatar">S</div>
+          <div class="pbubble">I'll guide you step by step. Navigate to the page you want to record and I'll capture each action automatically.</div>
+        </div>
+
+        <!-- Recording badge -->
+        <div class="prec-badge">
+          <div class="prec-dot"></div>
+          Recording · 3 steps captured
+        </div>
+
+        <!-- Sarah message 3 -->
+        <div class="pmsg sarah">
+          <div class="pavatar">S</div>
+          <div class="pbubble">Great! You've reached the Team page. Should I highlight this table for the trainees?</div>
+        </div>
+
+        <!-- Action chips -->
+        <div class="pchips">
+          <div class="pchip">Yes, highlight it</div>
+          <div class="pchip">Skip this step</div>
+          <div class="pchip danger" style="border-color:#EF4444;color:#EF4444;">Stop recording</div>
+        </div>
+      </div>
+
+      <div class="popup-input">
+        <input type="text" placeholder="Ask Sarah anything…" disabled />
+        <button class="popup-send">
+          <svg viewBox="0 0 24 24"><path d="M2 21L23 12 2 3v7l15 2-15 2z"/></svg>
+        </button>
+      </div>
+    </div>
+
+  </div><!-- /page-content -->
+</div><!-- /browser -->
+
+</body>
+</html>
